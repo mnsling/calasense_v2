@@ -5,14 +5,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import '../components/scanresultpage.dart';
+
+import 'scaninfopage.dart';
 
 class ScanPreviewPage extends StatefulWidget {
   final XFile image;
+  final void Function(XFile image) onSaveScan;
 
   const ScanPreviewPage({
     super.key,
     required this.image,
+    required this.onSaveScan,
   });
 
   @override
@@ -54,11 +57,9 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to open camera.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Unable to open camera.')));
     }
   }
 
@@ -73,19 +74,9 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
       _isScanning = true;
     });
 
-    // ------------------------------------------------------------
-    // TEMPORARY
-    // ------------------------------------------------------------
-    // This is where your AI / disease detection model will
-    // eventually process _currentImage.path.
-    //
-    // For now we're using placeholder scan data so that
-    // we can finish the UI and navigation.
-    // ------------------------------------------------------------
-
-    await Future.delayed(
-      const Duration(milliseconds: 900),
-    );
+    // Temporary delay to simulate disease scanning.
+    // Remove this once the ML model is connected.
+    await Future.delayed(const Duration(milliseconds: 800));
 
     if (!mounted) return;
 
@@ -93,27 +84,14 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
       _isScanning = false;
     });
 
-    Navigator.of(context).push(
+    Navigator.push(
+      context,
       MaterialPageRoute(
-        builder: (_) => ScanResultPage(
+        builder: (_) => ScanInfoPage(
           image: _currentImage,
-
-          // TEMP DATA
-          diseaseName: 'Leaf Miner',
-          confidence: 92,
-
-          scanDate: DateTime.now(),
-
-          location: 'Davao City',
-
-          definition:
-              'Leaf miners are tiny insects that burrow inside '
-              'the leaf tissue, causing visible trails and damage.',
-
-          symptoms:
-              'Winding, irregular trails on the leaf surface, '
-              'yellowing or pale patches, and distorted growth '
-              'in severe cases.',
+          onSave: () {
+            widget.onSaveScan(_currentImage);
+          },
         ),
       ),
     );
@@ -129,23 +107,14 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
           // BACKGROUND
           // ======================================================
 
-          Image.asset(
-            'assets/images/bg2.png',
-            fit: BoxFit.cover,
-          ),
+          Image.asset('assets/images/bg2.png', fit: BoxFit.cover),
 
           // ======================================================
           // CONTENT
           // ======================================================
-
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                24,
-                26,
-                24,
-                36,
-              ),
+              padding: const EdgeInsets.fromLTRB(24, 26, 24, 36),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -164,7 +133,6 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                   // ==================================================
                   // TITLE
                   // ==================================================
-
                   Text(
                     'Photo Captured!',
                     style: GoogleFonts.poppins(
@@ -195,7 +163,6 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                   // ==================================================
                   // IMAGE
                   // ==================================================
-
                   ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: AspectRatio(
@@ -213,21 +180,14 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                   // ==================================================
                   // ACTION CARD
                   // ==================================================
-
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(
-                      16,
-                      14,
-                      16,
-                      14,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color:
-                            Colors.white.withValues(alpha: 0.24),
+                        color: Colors.white.withValues(alpha: 0.24),
                       ),
                     ),
                     child: Column(
@@ -248,22 +208,16 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                         // ============================================
                         // SCAN
                         // ============================================
-
                         _ActionTile(
                           icon: Icons.search_rounded,
-                          title: _isScanning
-                              ? 'Scanning...'
-                              : 'Scan Diseases',
-                          subtitle:
-                              'Analyze the leaf for possible diseases',
-                          onTap:
-                              _isScanning ? null : _scanDisease,
+                          title: _isScanning ? 'Scanning...' : 'Scan Diseases',
+                          subtitle: 'Analyze the leaf for possible diseases',
+                          onTap: _isScanning ? null : _scanDisease,
                           trailing: _isScanning
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child:
-                                      CircularProgressIndicator(
+                                  child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Colors.white,
                                   ),
@@ -272,20 +226,17 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                         ),
 
                         Divider(
-                          color:
-                              Colors.white.withValues(alpha: 0.14),
+                          color: Colors.white.withValues(alpha: 0.14),
                           height: 16,
                         ),
 
                         // ============================================
                         // RETAKE
                         // ============================================
-
                         _ActionTile(
                           icon: Icons.camera_alt_outlined,
                           title: 'Retake Photo',
-                          subtitle:
-                              'Take a new photo for better results',
+                          subtitle: 'Take a new photo for better results',
                           onTap: _retakePhoto,
                         ),
                       ],
@@ -308,9 +259,7 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
 class _BackButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _BackButton({
-    required this.onTap,
-  });
+  const _BackButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -359,9 +308,7 @@ class _ActionTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          vertical: 5,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
           children: [
             Container(
@@ -371,11 +318,7 @@ class _ActionTile extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: 18,
-              ),
+              child: Icon(icon, color: Colors.white, size: 18),
             ),
 
             const SizedBox(width: 11),
@@ -399,8 +342,7 @@ class _ActionTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: GoogleFonts.poppins(
-                      color:
-                          Colors.white.withValues(alpha: 0.68),
+                      color: Colors.white.withValues(alpha: 0.68),
                       fontSize: 7.5,
                       fontWeight: FontWeight.w400,
                       letterSpacing: -0.15,
@@ -410,7 +352,7 @@ class _ActionTile extends StatelessWidget {
               ),
             ),
 
-            if (trailing != null) trailing!,
+            ?trailing,
           ],
         ),
       ),

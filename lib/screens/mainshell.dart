@@ -1,7 +1,9 @@
 // lib/screens/main_shell.dart
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/bottomnavbar.dart';
 import 'scanpreviewpage.dart';
@@ -18,21 +20,9 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  // ============================================================
-  // NAVIGATION
-  // ============================================================
-
   int _selectedIndex = 0;
 
-  // ============================================================
-  // IMAGE PICKER
-  // ============================================================
-
   final ImagePicker _picker = ImagePicker();
-
-  // ============================================================
-  // CHANGE MAIN PAGE
-  // ============================================================
 
   void _changePage(int index) {
     setState(() {
@@ -40,8 +30,64 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  Future<void> _saveScanToSupabase({
+    required XFile image,
+    required String diseaseType,
+    required double confidence,
+  }) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    try {
+      final extension = image.path.split('.').last.toLowerCase();
+
+      final filePath =
+          '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+      // Upload image
+      await supabase.storage
+          .from('scan-images')
+          .upload(filePath, File(image.path));
+
+      // Get image URL
+      final imageUrl = supabase.storage
+          .from('scan-images')
+          .getPublicUrl(filePath);
+
+      // Save scan information
+      await supabase.from('scans').insert({
+        'user_id': user.id,
+        'image_url': imageUrl,
+        'disease_type': diseaseType,
+        'confidence': confidence,
+      });
+
+      if (!mounted) return;
+
+      // Go to Collections
+      setState(() {
+        _selectedIndex = 1;
+      });
+
+      // Close ScanInfoPage
+      Navigator.pop(context);
+
+      // Close ScanPreviewPage
+      Navigator.pop(context);
+    } catch (error) {
+      debugPrint('Save scan error: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Unable to save scan: $error')));
+    }
+  }
+
   // ============================================================
-  // OPEN SCANNER OPTIONS
+  // OPEN CAMERA / GALLERY OPTIONS
   // ============================================================
 
   Future<void> _openScanner() async {
@@ -59,10 +105,7 @@ class _MainShellState extends State<MainShell> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ==================================================
                 // HANDLE
-                // ==================================================
-
                 Container(
                   width: 38,
                   height: 4,
@@ -74,9 +117,7 @@ class _MainShellState extends State<MainShell> {
 
                 const SizedBox(height: 18),
 
-                // ==================================================
                 // TITLE
-                // ==================================================
                 const Text(
                   'Upload Leaf Photo',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -92,9 +133,7 @@ class _MainShellState extends State<MainShell> {
 
                 const SizedBox(height: 20),
 
-                // ==================================================
                 // TAKE PHOTO
-                // ==================================================
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
@@ -135,9 +174,7 @@ class _MainShellState extends State<MainShell> {
 
                 const SizedBox(height: 4),
 
-                // ==================================================
                 // CHOOSE FROM GALLERY
-                // ==================================================
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
@@ -191,9 +228,7 @@ class _MainShellState extends State<MainShell> {
         maxWidth: 2000,
       );
 
-      if (image == null) {
-        return;
-      }
+      if (image == null) return;
 
       if (!mounted) return;
 
@@ -210,12 +245,24 @@ class _MainShellState extends State<MainShell> {
   }
 
   // ============================================================
-  // HANDLE SELECTED IMAGE
+  // OPEN SCAN PREVIEW
   // ============================================================
 
   void _handleSelectedImage(XFile image) {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => ScanPreviewPage(image: image)));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ScanPreviewPage(
+          image: image,
+          onSaveScan: (selectedImage) {
+            _saveScanToSupabase(
+              image: selectedImage,
+              diseaseType: 'Leaf Miner',
+              confidence: 92,
+            );
+          },
+        ),
+      ),
+    );
   }
 
   // ============================================================
@@ -225,25 +272,16 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      // ========================================================
-      // HOME / DASHBOARD
-      // ========================================================
-
+      // HOME
       DashboardPage(onScanPressed: _openScanner),
 
-      // ========================================================
       // COLLECTIONS
-      // ========================================================
       const CollectionsPage(),
 
-      // ========================================================
       // LEARN
-      // ========================================================
       const LearnPage(),
 
-      // ========================================================
       // PROFILE
-      // ========================================================
       ProfilePage(
         onOpenCollections: () {
           _changePage(1);
@@ -254,14 +292,8 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       extendBody: false,
 
-      // ========================================================
-      // PAGE CONTENT
-      // ========================================================
       body: IndexedStack(index: _selectedIndex, children: pages),
 
-      // ========================================================
-      // BOTTOM NAVBAR
-      // ========================================================
       bottomNavigationBar: BottomNavbar(
         selectedIndex: _selectedIndex,
         onItemSelected: _changePage,

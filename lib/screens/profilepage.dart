@@ -1,11 +1,16 @@
-// lib/screens/profile_page.dart
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/pageheader.dart';
 import 'signinpage.dart';
+
+// ===============================================================
+// PROFILE PAGE
+// ===============================================================
 
 class ProfilePage extends StatefulWidget {
   final VoidCallback? onOpenCollections;
@@ -17,98 +22,72 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  static const double pagePadding = 24.0;
+  final supabase = Supabase.instance.client;
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  String username = 'User';
+  String email = '';
+  String? avatarUrl;
 
-  String _username = 'User';
-  String _email = '';
-  bool _isLoading = true;
-  bool _isLoggingOut = false;
+  bool loading = true;
+  bool loggingOut = false;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    loadProfile();
   }
 
-  Future<void> _loadProfile() async {
-    try {
-      final user = _supabase.auth.currentUser;
+  Future<void> loadProfile() async {
+    final user = supabase.auth.currentUser;
 
-      if (user == null) {
-        if (!mounted) return;
-
-        setState(() {
-          _username = 'User';
-          _email = '';
-          _isLoading = false;
-        });
-
-        return;
+    if (user == null) {
+      if (mounted) {
+        setState(() => loading = false);
       }
+      return;
+    }
 
-      final profile = await _supabase
+    try {
+      final profile = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, avatar_url')
           .eq('id', user.id)
           .maybeSingle();
 
       if (!mounted) return;
 
-      final username = profile?['username']?.toString().trim();
-
       setState(() {
-        _username = username != null && username.isNotEmpty ? username : 'User';
+        username = profile?['username']?.toString().trim().isNotEmpty == true
+            ? profile!['username']
+            : 'User';
 
-        _email = user.email ?? '';
-
-        _isLoading = false;
+        avatarUrl = profile?['avatar_url'];
+        email = user.email ?? '';
+        loading = false;
       });
-    } catch (error) {
-      debugPrint('Error loading profile: $error');
+    } catch (e) {
+      debugPrint('Load profile error: $e');
 
-      if (!mounted) return;
-
-      final user = _supabase.auth.currentUser;
-
-      setState(() {
-        _username = 'User';
-        _email = user?.email ?? '';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
-  Future<void> _logout() async {
-    if (_isLoggingOut) return;
+  Future<void> logout() async {
+    if (loggingOut) return;
 
-    setState(() {
-      _isLoggingOut = true;
-    });
+    setState(() => loggingOut = true);
 
-    try {
-      await _supabase.auth.signOut();
+    await supabase.auth.signOut();
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const SignInPage()),
-        (route) => false,
-      );
-    } catch (error) {
-      debugPrint('Logout error: $error');
-
-      if (!mounted) return;
-
-      setState(() {
-        _isLoggingOut = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to log out. Please try again.')),
-      );
-    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const SignInPage()),
+      (_) => false,
+    );
   }
 
   @override
@@ -116,54 +95,74 @@ class _ProfilePageState extends State<ProfilePage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(
-          'assets/images/bg2.png',
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-        ),
+        Image.asset('assets/images/bg2.png', fit: BoxFit.cover),
 
-        // =====================================================
-        // PAGE CONTENT
-        // =====================================================
         SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              pagePadding,
-              28,
-              pagePadding,
-              35,
-            ),
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 35),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // =================================================
-                // SHARED HEADER
-                // =================================================
                 const PageHeader(
                   title: 'My Profile',
-                  subtitle:
-                      'Manage your account and\n'
-                      'preferences.',
+                  subtitle: 'Manage your account and\npreferences.',
                 ),
 
                 const SizedBox(height: 28),
 
-                // =================================================
-                // USER CARD
-                // =================================================
-                _ProfileCard(
-                  username: _username,
-                  email: _email,
-                  isLoading: _isLoading,
+                // PROFILE CARD
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      AvatarWidget(size: 58, avatarUrl: avatarUrl),
+
+                      const SizedBox(width: 14),
+
+                      Expanded(
+                        child: loading
+                            ? const CircularProgressIndicator(
+                                color: Color(0xFF49784D),
+                                strokeWidth: 2,
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    username,
+                                    style: GoogleFonts.poppins(
+                                      color: const Color(0xFF315B34),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 3),
+
+                                  Text(
+                                    email,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.grey.shade500,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 14),
 
-                // =================================================
-                // MENU CARD
-                // =================================================
+                // MENU
                 Container(
-                  width: double.infinity,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 10,
@@ -174,22 +173,24 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   child: Column(
                     children: [
-                      _ProfileMenuItem(
-                        icon: Icons.person_outline_rounded,
+                      MenuTile(
+                        icon: Icons.person_outline,
                         title: 'Personal Information',
                         subtitle: 'Update your account details',
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => const PersonalInformationPage(),
                             ),
                           );
+
+                          loadProfile();
                         },
                       ),
 
-                      _ProfileMenuItem(
-                        icon: Icons.bookmark_border_rounded,
+                      MenuTile(
+                        icon: Icons.bookmark_border,
                         title: 'My Collections',
                         subtitle: 'View and manage your collections',
                         onTap: widget.onOpenCollections,
@@ -200,50 +201,30 @@ class _ProfilePageState extends State<ProfilePage> {
 
                 const SizedBox(height: 14),
 
-                // =================================================
-                // LOGOUT CARD
-                // =================================================
-                Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
-                    onTap: _isLoggingOut ? null : _logout,
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 15,
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF7DADA),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF7DADA),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.logout_rounded,
-                              color: Color(0xFFD85C5C),
-                              size: 20,
-                            ),
-                          ),
-
-                          const SizedBox(width: 14),
-
-                          Text(
-                            _isLoggingOut ? 'Logging Out...' : 'Log Out',
-                            style: GoogleFonts.poppins(
-                              color: const Color(0xFFD85C5C),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ],
+                      child: const Icon(Icons.logout, color: Color(0xFFD85C5C)),
+                    ),
+                    title: Text(
+                      loggingOut ? 'Logging Out...' : 'Log Out',
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFFD85C5C),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
+                    onTap: logout,
                   ),
                 ),
               ],
@@ -255,179 +236,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
-// =============================================================
-// PROFILE CARD
-// =============================================================
-
-class _ProfileCard extends StatelessWidget {
-  final String username;
-  final String email;
-  final bool isLoading;
-
-  const _ProfileCard({
-    required this.username,
-    required this.email,
-    required this.isLoading,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          // Generic avatar because signup currently
-          // does not contain a profile image.
-          Container(
-            width: 58,
-            height: 58,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE4EDE0),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Color(0xFF49784D),
-              size: 30,
-            ),
-          ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: isLoading
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF49784D),
-                      ),
-                    ),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          color: const Color(0xFF315B34),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        email,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey.shade500,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================
-// PROFILE MENU ITEM
-// =============================================================
-
-class _ProfileMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  const _ProfileMenuItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCE8D8),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: const Color(0xFF49784D), size: 20),
-              ),
-
-              const SizedBox(width: 14),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        color: const Color(0xFF252525),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-
-                    const SizedBox(height: 2),
-
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.poppins(
-                        color: Colors.grey.shade500,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: -0.15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================
+// ===============================================================
 // PERSONAL INFORMATION PAGE
-// =============================================================
+// ===============================================================
 
 class PersonalInformationPage extends StatefulWidget {
   const PersonalInformationPage({super.key});
@@ -437,593 +248,249 @@ class PersonalInformationPage extends StatefulWidget {
       _PersonalInformationPageState();
 }
 
-class _PersonalInformationPageState
-    extends State<PersonalInformationPage> {
-  static const double pagePadding = 24.0;
+class _PersonalInformationPageState extends State<PersonalInformationPage> {
+  final supabase = Supabase.instance.client;
+  final picker = ImagePicker();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final usernameController = TextEditingController();
+  final emailController = TextEditingController();
 
-  final TextEditingController _usernameController =
-      TextEditingController();
+  String? avatarUrl;
+  XFile? selectedImage;
 
-  final TextEditingController _emailController =
-      TextEditingController();
-
-  bool _isLoading = true;
-  bool _isSaving = false;
+  bool loading = true;
+  bool saving = false;
+  bool uploadingPhoto = false;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    loadProfile();
   }
 
-  // =============================================================
-  // LOAD PROFILE DATA
-  // =============================================================
+  Future<void> loadProfile() async {
+    final user = supabase.auth.currentUser;
 
-  Future<void> _loadProfile() async {
-    try {
-      final user = _supabase.auth.currentUser;
+    if (user == null) return;
 
-      if (user == null) {
-        if (!mounted) return;
+    final profile = await supabase
+        .from('profiles')
+        .select('username, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
 
-        setState(() {
-          _isLoading = false;
-        });
+    if (!mounted) return;
 
-        return;
-      }
+    usernameController.text = profile?['username'] ?? '';
+    emailController.text = user.email ?? '';
+    avatarUrl = profile?['avatar_url'];
 
-      final profile = await _supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (!mounted) return;
-
-      final username =
-          profile?['username']?.toString().trim() ?? '';
-
-      _usernameController.text = username;
-      _emailController.text = user.email ?? '';
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (error) {
-      debugPrint(
-        'Error loading personal information: $error',
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    setState(() => loading = false);
   }
 
-  // =============================================================
-  // SAVE USERNAME
-  // =============================================================
+  Future<void> choosePhoto() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
 
-  Future<void> _saveChanges() async {
-    final user = _supabase.auth.currentUser;
+                const SizedBox(height: 18),
 
-    if (user == null || _isSaving) return;
+                Text(
+                  'Change Profile Photo',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
 
-    final username = _usernameController.text.trim();
+                const SizedBox(height: 18),
 
-    if (username.isEmpty) {
-      _showMessage(
-        'Username cannot be empty.',
-        isError: true,
-      );
-      return;
-    }
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: Color(0xFF49784D),
+                  ),
+                  title: Text(
+                    'Take Photo',
+                    style: GoogleFonts.poppins(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickImage(ImageSource.camera);
+                  },
+                ),
 
-    if (username.length < 3) {
-      _showMessage(
-        'Username must be at least 3 characters.',
-        isError: true,
-      );
-      return;
-    }
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library_rounded,
+                    color: Color(0xFF49784D),
+                  ),
+                  title: Text(
+                    'Choose from Gallery',
+                    style: GoogleFonts.poppins(fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
-    setState(() {
-      _isSaving = true;
-    });
-
+  Future<void> pickImage(ImageSource source) async {
     try {
-      await _supabase
+      final user = supabase.auth.currentUser;
+
+      if (user == null) return;
+
+      final image = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1200,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        selectedImage = image;
+        uploadingPhoto = true;
+      });
+
+      final extension = image.path.split('.').last;
+      final filePath =
+          '${user.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.$extension';
+
+      final file = File(image.path);
+
+      await supabase.storage
+          .from('avatars')
+          .upload(
+            filePath,
+            file,
+            fileOptions: const FileOptions(cacheControl: '3600'),
+          );
+
+      final url = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      await supabase
           .from('profiles')
-          .update({
-            'username': username,
-          })
+          .update({'avatar_url': url})
           .eq('id', user.id);
 
       if (!mounted) return;
 
       setState(() {
-        _isSaving = false;
+        avatarUrl = url;
+        selectedImage = null;
+        uploadingPhoto = false;
       });
 
-      _showMessage(
-        'Profile updated successfully.',
-      );
-    } on PostgrestException catch (error) {
+      showMessage('Profile photo updated');
+    } catch (e) {
+      debugPrint('Upload error: $e');
+
       if (!mounted) return;
 
-      setState(() {
-        _isSaving = false;
-      });
+      setState(() => uploadingPhoto = false);
 
-      if (error.code == '23505') {
-        _showMessage(
-          'That username is already taken.',
-          isError: true,
-        );
-      } else {
-        _showMessage(
-          'Unable to update profile.',
-          isError: true,
-        );
-      }
-
-      debugPrint('Profile update error: $error');
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
-        _isSaving = false;
-      });
-
-      _showMessage(
-        'Unable to update profile.',
-        isError: true,
-      );
-
-      debugPrint('Profile update error: $error');
+      showMessage('Unable to upload photo', error: true);
     }
   }
 
-  // =============================================================
-  // CHANGE PASSWORD
-  // =============================================================
+  Future<void> saveChanges() async {
+    final user = supabase.auth.currentUser;
 
-  Future<void> _showChangePasswordDialog() async {
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController =
-        TextEditingController();
+    if (user == null) return;
 
-    bool obscureNewPassword = true;
-    bool obscureConfirmPassword = true;
-    bool isUpdatingPassword = false;
+    setState(() => saving = true);
 
-    await showDialog(
+    try {
+      await supabase
+          .from('profiles')
+          .update({'username': usernameController.text.trim()})
+          .eq('id', user.id);
+
+      if (!mounted) return;
+
+      showMessage('Profile updated');
+    } catch (e) {
+      showMessage('Unable to update profile', error: true);
+    }
+
+    if (mounted) {
+      setState(() => saving = false);
+    }
+  }
+
+  Future<void> changePassword() async {
+    final controller = TextEditingController();
+
+    final password = await showDialog<String>(
       context: context,
-      barrierDismissible: !isUpdatingPassword,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (
-            BuildContext context,
-            StateSetter setDialogState,
-          ) {
-            Future<void> updatePassword() async {
-              final newPassword =
-                  newPasswordController.text.trim();
-
-              final confirmPassword =
-                  confirmPasswordController.text.trim();
-
-              if (newPassword.isEmpty ||
-                  confirmPassword.isEmpty) {
-                _showMessage(
-                  'Please complete both password fields.',
-                  isError: true,
-                );
-                return;
-              }
-
-              if (newPassword.length < 6) {
-                _showMessage(
-                  'Password must be at least 6 characters.',
-                  isError: true,
-                );
-                return;
-              }
-
-              if (newPassword != confirmPassword) {
-                _showMessage(
-                  'Passwords do not match.',
-                  isError: true,
-                );
-                return;
-              }
-
-              setDialogState(() {
-                isUpdatingPassword = true;
-              });
-
-              try {
-                await _supabase.auth.updateUser(
-                  UserAttributes(
-                    password: newPassword,
-                  ),
-                );
-
-                if (!mounted) return;
-
-                Navigator.of(dialogContext).pop();
-
-                _showMessage(
-                  'Password updated successfully.',
-                );
-              } on AuthException catch (error) {
-                setDialogState(() {
-                  isUpdatingPassword = false;
-                });
-
-                _showMessage(
-                  error.message,
-                  isError: true,
-                );
-              } catch (error) {
-                setDialogState(() {
-                  isUpdatingPassword = false;
-                });
-
-                _showMessage(
-                  'Unable to change password.',
-                  isError: true,
-                );
-
-                debugPrint(
-                  'Password update error: $error',
-                );
-              }
-            }
-
-            return Dialog(
-              insetPadding:
-                  const EdgeInsets.symmetric(
-                horizontal: 24,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  22,
-                  24,
-                  22,
-                  22,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Change Password',
-                      style: GoogleFonts.poppins(
-                        color: const Color(0xFF315B34),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.6,
-                      ),
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      'Enter your new password below.',
-                      style: GoogleFonts.poppins(
-                        color: Colors.grey.shade500,
-                        fontSize: 9.5,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    Text(
-                      'New Password',
-                      style: GoogleFonts.poppins(
-                        color: const Color(0xFF303030),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    TextField(
-                      controller:
-                          newPasswordController,
-                      obscureText:
-                          obscureNewPassword,
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Enter new password',
-                        hintStyle:
-                            GoogleFonts.poppins(
-                          color:
-                              Colors.grey.shade400,
-                          fontSize: 9.5,
-                        ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 13,
-                        ),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              obscureNewPassword =
-                                  !obscureNewPassword;
-                            });
-                          },
-                          icon: Icon(
-                            obscureNewPassword
-                                ? Icons
-                                    .visibility_off_outlined
-                                : Icons
-                                    .visibility_outlined,
-                            size: 18,
-                            color:
-                                Colors.grey.shade500,
-                          ),
-                        ),
-                        enabledBorder:
-                            OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(9),
-                          borderSide: BorderSide(
-                            color:
-                                Colors.grey.shade300,
-                          ),
-                        ),
-                        focusedBorder:
-                            OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(9),
-                          borderSide:
-                              const BorderSide(
-                            color:
-                                Color(0xFF49784D),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    Text(
-                      'Confirm New Password',
-                      style: GoogleFonts.poppins(
-                        color: const Color(0xFF303030),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    TextField(
-                      controller:
-                          confirmPasswordController,
-                      obscureText:
-                          obscureConfirmPassword,
-                      style: GoogleFonts.poppins(
-                        fontSize: 10,
-                      ),
-                      decoration: InputDecoration(
-                        hintText:
-                            'Confirm new password',
-                        hintStyle:
-                            GoogleFonts.poppins(
-                          color:
-                              Colors.grey.shade400,
-                          fontSize: 9.5,
-                        ),
-                        contentPadding:
-                            const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 13,
-                        ),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              obscureConfirmPassword =
-                                  !obscureConfirmPassword;
-                            });
-                          },
-                          icon: Icon(
-                            obscureConfirmPassword
-                                ? Icons
-                                    .visibility_off_outlined
-                                : Icons
-                                    .visibility_outlined,
-                            size: 18,
-                            color:
-                                Colors.grey.shade500,
-                          ),
-                        ),
-                        enabledBorder:
-                            OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(9),
-                          borderSide: BorderSide(
-                            color:
-                                Colors.grey.shade300,
-                          ),
-                        ),
-                        focusedBorder:
-                            OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(9),
-                          borderSide:
-                              const BorderSide(
-                            color:
-                                Color(0xFF49784D),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed:
-                                isUpdatingPassword
-                                    ? null
-                                    : () {
-                                        Navigator.pop(
-                                          dialogContext,
-                                        );
-                                      },
-                            style:
-                                OutlinedButton.styleFrom(
-                              minimumSize:
-                                  const Size(
-                                double.infinity,
-                                43,
-                              ),
-                              foregroundColor:
-                                  const Color(
-                                0xFF49784D,
-                              ),
-                              side: const BorderSide(
-                                color:
-                                    Color(0xFF49784D),
-                              ),
-                              shape:
-                                  RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(
-                                  8,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              'Cancel',
-                              style:
-                                  GoogleFonts.poppins(
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 10),
-
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed:
-                                isUpdatingPassword
-                                    ? null
-                                    : updatePassword,
-                            style:
-                                ElevatedButton.styleFrom(
-                              minimumSize:
-                                  const Size(
-                                double.infinity,
-                                43,
-                              ),
-                              backgroundColor:
-                                  const Color(
-                                0xFF49784D,
-                              ),
-                              foregroundColor:
-                                  Colors.white,
-                              elevation: 0,
-                              shape:
-                                  RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(
-                                  8,
-                                ),
-                              ),
-                            ),
-                            child:
-                                isUpdatingPassword
-                                    ? const SizedBox(
-                                        width: 17,
-                                        height: 17,
-                                        child:
-                                            CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color:
-                                              Colors.white,
-                                        ),
-                                      )
-                                    : Text(
-                                        'Update',
-                                        style: GoogleFonts
-                                            .poppins(
-                                          fontSize: 10,
-                                          fontWeight:
-                                              FontWeight
-                                                  .w500,
-                                        ),
-                                      ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            'Change Password',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'New Password'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, controller.text.trim());
+              },
+              child: const Text('Update'),
+            ),
+          ],
         );
       },
     );
 
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
-  }
+    if (password == null || password.length < 6) return;
 
-  // =============================================================
-  // PROFILE PICTURE
-  // =============================================================
+    await supabase.auth.updateUser(UserAttributes(password: password));
 
-  void _chooseProfilePicture() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Profile picture upload coming next',
-        ),
-      ),
-    );
-  }
-
-  // =============================================================
-  // MESSAGE
-  // =============================================================
-
-  void _showMessage(
-    String message, {
-    bool isError = false,
-  }) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .hideCurrentSnackBar();
+    showMessage('Password updated');
+  }
 
+  void showMessage(String text, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError
+        content: Text(text),
+        backgroundColor: error
             ? const Color(0xFFD85C5C)
             : const Color(0xFF49784D),
       ),
@@ -1032,14 +499,10 @@ class _PersonalInformationPageState
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _emailController.dispose();
+    usernameController.dispose();
+    emailController.dispose();
     super.dispose();
   }
-
-  // =============================================================
-  // BUILD
-  // =============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -1047,276 +510,153 @@ class _PersonalInformationPageState
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // =====================================================
-          // BACKGROUND
-          // =====================================================
-          Image.asset(
-            'assets/images/bg2.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-          ),
+          Image.asset('assets/images/bg2.png', fit: BoxFit.cover),
 
-          // =====================================================
-          // CONTENT
-          // =====================================================
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                pagePadding,
-                28,
-                pagePadding,
-                35,
-              ),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 35),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // =================================================
-                  // BACK BUTTON
-                  // =================================================
-                  InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                    },
-                    borderRadius:
-                        BorderRadius.circular(30),
-                    child: const SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Align(
-                        alignment:
-                            Alignment.centerLeft,
-                        child: Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
                     ),
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // =================================================
-                  // HEADER
-                  // =================================================
                   const PageHeader(
                     title: 'Personal Information',
-                    subtitle:
-                        'Manage your account details',
+                    subtitle: 'Manage your account details',
                   ),
 
                   const SizedBox(height: 28),
 
-                  // =================================================
-                  // CARD
-                  // =================================================
                   Container(
                     width: double.infinity,
-                    padding:
-                        const EdgeInsets.fromLTRB(
-                      18,
-                      24,
-                      18,
-                      24,
-                    ),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                    child: _isLoading
+                    child: loading
                         ? const Center(
                             child: Padding(
-                              padding:
-                                  EdgeInsets.all(35),
-                              child:
-                                  CircularProgressIndicator(
-                                color:
-                                    Color(0xFF49784D),
-                              ),
+                              padding: EdgeInsets.all(30),
+                              child: CircularProgressIndicator(),
                             ),
                           )
                         : Column(
                             children: [
-                              // =====================================
-                              // PROFILE PHOTO
-                              // =====================================
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    width: 72,
-                                    height: 72,
-                                    decoration:
-                                        const BoxDecoration(
-                                      color:
-                                          Color(0xFFE4EDE0),
-                                      shape:
-                                          BoxShape.circle,
+                              GestureDetector(
+                                onTap: choosePhoto,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    AvatarWidget(
+                                      size: 72,
+                                      avatarUrl: selectedImage != null
+                                          ? null
+                                          : avatarUrl,
+                                      localFile: selectedImage != null
+                                          ? File(selectedImage!.path)
+                                          : null,
                                     ),
-                                    child: const Icon(
-                                      Icons
-                                          .person_rounded,
-                                      color:
-                                          Color(0xFF49784D),
-                                      size: 36,
-                                    ),
-                                  ),
 
-                                  Positioned(
-                                    right: -2,
-                                    bottom: -2,
-                                    child:
-                                        GestureDetector(
-                                      onTap:
-                                          _chooseProfilePicture,
+                                    Positioned(
+                                      right: -2,
+                                      bottom: -2,
                                       child: Container(
-                                        width: 25,
-                                        height: 25,
-                                        decoration:
-                                            BoxDecoration(
-                                          color:
-                                              const Color(
-                                            0xFF49784D,
-                                          ),
-                                          shape:
-                                              BoxShape.circle,
-                                          border:
-                                              Border.all(
-                                            color:
-                                                Colors.white,
+                                        width: 26,
+                                        height: 26,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF49784D),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
                                             width: 2,
                                           ),
                                         ),
-                                        child:
-                                            const Icon(
-                                          Icons
-                                              .camera_alt_rounded,
-                                          color:
-                                              Colors.white,
-                                          size: 13,
+                                        child: const Icon(
+                                          Icons.camera_alt_rounded,
+                                          size: 14,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
 
                               const SizedBox(height: 8),
 
                               GestureDetector(
-                                onTap:
-                                    _chooseProfilePicture,
+                                onTap: choosePhoto,
                                 child: Text(
-                                  'Change Photo',
-                                  style:
-                                      GoogleFonts.poppins(
-                                    color: Colors
-                                        .grey.shade600,
+                                  uploadingPhoto
+                                      ? 'Uploading...'
+                                      : 'Change Photo',
+                                  style: GoogleFonts.poppins(
                                     fontSize: 8,
-                                    fontWeight:
-                                        FontWeight.w400,
-                                    letterSpacing:
-                                        -0.2,
+                                    color: Colors.grey.shade600,
                                   ),
                                 ),
                               ),
 
-                              const SizedBox(height: 30),
+                              const SizedBox(height: 28),
 
-                              // =====================================
-                              // USERNAME
-                              // =====================================
-                              _InformationField(
+                              InputField(
                                 label: 'Username',
-                                icon: Icons
-                                    .person_outline_rounded,
-                                controller:
-                                    _usernameController,
+                                icon: Icons.person_outline,
+                                controller: usernameController,
                               ),
 
                               const SizedBox(height: 15),
 
-                              // =====================================
-                              // EMAIL
-                              // =====================================
-                              _InformationField(
+                              InputField(
                                 label: 'Email',
-                                icon: Icons
-                                    .mail_outline_rounded,
-                                controller:
-                                    _emailController,
+                                icon: Icons.mail_outline,
+                                controller: emailController,
                                 readOnly: true,
                               ),
 
                               const SizedBox(height: 15),
 
-                              // =====================================
-                              // PASSWORD
-                              // =====================================
-                              _PasswordField(
-                                onChangePassword:
-                                    _showChangePasswordDialog,
-                              ),
+                              PasswordField(onChange: changePassword),
 
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 26),
 
-                              // =====================================
-                              // SAVE BUTTON
-                              // =====================================
                               SizedBox(
                                 width: double.infinity,
                                 height: 44,
                                 child: ElevatedButton(
-                                  onPressed: _isSaving
-                                      ? null
-                                      : _saveChanges,
-                                  style: ElevatedButton
-                                      .styleFrom(
-                                    backgroundColor:
-                                        const Color(
-                                      0xFF49784D,
-                                    ),
-                                    foregroundColor:
-                                        Colors.white,
-                                    disabledBackgroundColor:
-                                        const Color(
-                                      0xFF49784D,
-                                    ).withValues(
-                                      alpha: 0.6,
-                                    ),
+                                  onPressed: saving ? null : saveChanges,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF49784D),
+                                    foregroundColor: Colors.white,
                                     elevation: 0,
-                                    shape:
-                                        RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius
-                                              .circular(8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
-                                  child: _isSaving
+                                  child: saving
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child:
-                                              CircularProgressIndicator(
-                                            strokeWidth:
-                                                2,
-                                            color: Colors
-                                                .white,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
                                           ),
                                         )
                                       : Text(
                                           'Save Changes',
-                                          style:
-                                              GoogleFonts
-                                                  .poppins(
+                                          style: GoogleFonts.poppins(
                                             fontSize: 10,
-                                            fontWeight:
-                                                FontWeight
-                                                    .w500,
-                                            letterSpacing:
-                                                -0.2,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
                                 ),
@@ -1334,17 +674,112 @@ class _PersonalInformationPageState
   }
 }
 
-// =============================================================
-// INFORMATION FIELD
-// =============================================================
+// ===============================================================
+// AVATAR
+// ===============================================================
 
-class _InformationField extends StatelessWidget {
+class AvatarWidget extends StatelessWidget {
+  final double size;
+  final String? avatarUrl;
+  final File? localFile;
+
+  const AvatarWidget({
+    super.key,
+    required this.size,
+    this.avatarUrl,
+    this.localFile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: Color(0xFFE4EDE0),
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: localFile != null
+            ? Image.file(localFile!, fit: BoxFit.cover)
+            : avatarUrl != null && avatarUrl!.isNotEmpty
+            ? Image.network(
+                avatarUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) {
+                  return const Icon(
+                    Icons.person_rounded,
+                    color: Color(0xFF49784D),
+                    size: 30,
+                  );
+                },
+              )
+            : Icon(
+                Icons.person_rounded,
+                color: const Color(0xFF49784D),
+                size: size * .5,
+              ),
+      ),
+    );
+  }
+}
+
+// ===============================================================
+// MENU TILE
+// ===============================================================
+
+class MenuTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  const MenuTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      onTap: onTap,
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xFFDCE8D8),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: const Color(0xFF49784D)),
+      ),
+      title: Text(
+        title,
+        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: GoogleFonts.poppins(fontSize: 8, color: Colors.grey.shade500),
+      ),
+    );
+  }
+}
+
+// ===============================================================
+// INPUT FIELD
+// ===============================================================
+
+class InputField extends StatelessWidget {
   final String label;
   final IconData icon;
   final TextEditingController controller;
   final bool readOnly;
 
-  const _InformationField({
+  const InputField({
+    super.key,
     required this.label,
     required this.icon,
     required this.controller,
@@ -1353,18 +788,14 @@ class _InformationField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const borderColor = Color.fromRGBO(0, 0, 0, 0.22);
+
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(
-            color: const Color(0xFF303030),
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-          ),
+          style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.w600),
         ),
 
         const SizedBox(height: 5),
@@ -1376,15 +807,9 @@ class _InformationField extends StatelessWidget {
               height: 38,
               decoration: BoxDecoration(
                 color: const Color(0xFFDCE8D8),
-                borderRadius:
-                    BorderRadius.circular(9),
+                borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(
-                icon,
-                size: 19,
-                color:
-                    const Color(0xFF49784D),
-              ),
+              child: Icon(icon, color: const Color(0xFF49784D), size: 19),
             ),
 
             const SizedBox(width: 10),
@@ -1393,40 +818,23 @@ class _InformationField extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 readOnly: readOnly,
-                style: GoogleFonts.poppins(
-                  fontSize: 9,
-                  color:
-                      const Color(0xFF333333),
-                  letterSpacing: -0.2,
-                ),
+                style: GoogleFonts.poppins(fontSize: 9),
                 decoration: InputDecoration(
-                  filled: readOnly,
-                  fillColor: readOnly
-                      ? const Color(0xFFF8F8F8)
-                      : Colors.white,
                   isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
                     horizontal: 13,
                     vertical: 12,
                   ),
-                  enabledBorder:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color:
-                          Colors.grey.shade300,
-                    ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: borderColor),
                   ),
-                  focusedBorder:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(
-                      color:
-                          Color(0xFF49784D),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Color.fromRGBO(0, 0, 0, 0.35),
                     ),
                   ),
                 ),
@@ -1439,31 +847,25 @@ class _InformationField extends StatelessWidget {
   }
 }
 
-// =============================================================
+// ===============================================================
 // PASSWORD FIELD
-// =============================================================
+// ===============================================================
 
-class _PasswordField extends StatelessWidget {
-  final VoidCallback onChangePassword;
+class PasswordField extends StatelessWidget {
+  final VoidCallback onChange;
 
-  const _PasswordField({
-    required this.onChangePassword,
-  });
+  const PasswordField({super.key, required this.onChange});
 
   @override
   Widget build(BuildContext context) {
+    const borderColor = Color.fromRGBO(0, 0, 0, 0.22);
+
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Password',
-          style: GoogleFonts.poppins(
-            color: const Color(0xFF303030),
-            fontSize: 9,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-          ),
+          style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.w600),
         ),
 
         const SizedBox(height: 5),
@@ -1475,13 +877,12 @@ class _PasswordField extends StatelessWidget {
               height: 38,
               decoration: BoxDecoration(
                 color: const Color(0xFFDCE8D8),
-                borderRadius:
-                    BorderRadius.circular(9),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: const Icon(
-                Icons.lock_outline_rounded,
-                size: 19,
+                Icons.lock_outline,
                 color: Color(0xFF49784D),
+                size: 19,
               ),
             ),
 
@@ -1490,49 +891,27 @@ class _PasswordField extends StatelessWidget {
             Expanded(
               child: Container(
                 height: 38,
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 13,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 13),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F8F8),
-                  borderRadius:
-                      BorderRadius.circular(8),
-                  border: Border.all(
-                    color:
-                        Colors.grey.shade300,
-                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
                         '••••••••',
-                        style:
-                            GoogleFonts.poppins(
-                          color: const Color(
-                            0xFF333333,
-                          ),
-                          fontSize: 9,
-                          letterSpacing: 1,
-                        ),
+                        style: GoogleFonts.poppins(fontSize: 9),
                       ),
                     ),
 
-                    GestureDetector(
-                      onTap:
-                          onChangePassword,
+                    TextButton(
+                      onPressed: onChange,
                       child: Text(
                         'Change',
-                        style:
-                            GoogleFonts.poppins(
-                          color: const Color(
-                            0xFF49784D,
-                          ),
+                        style: GoogleFonts.poppins(
+                          color: const Color(0xFF49784D),
                           fontSize: 8.5,
-                          fontWeight:
-                              FontWeight.w500,
-                          letterSpacing: -0.2,
                         ),
                       ),
                     ),
