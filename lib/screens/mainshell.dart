@@ -4,16 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../components/bottomnavbar.dart';
-
+import 'scanpreviewpage.dart';
 import 'dashboardpage.dart';
 import 'collectionspage.dart';
 import 'learnpage.dart';
 import 'profilepage.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({
-    super.key,
-  });
+  const MainShell({super.key});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -52,19 +50,12 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(22),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (bottomSheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              24,
-              20,
-              24,
-              24,
-            ),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -86,13 +77,9 @@ class _MainShellState extends State<MainShell> {
                 // ==================================================
                 // TITLE
                 // ==================================================
-
                 const Text(
                   'Upload Leaf Photo',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
 
                 const SizedBox(height: 6),
@@ -100,10 +87,7 @@ class _MainShellState extends State<MainShell> {
                 Text(
                   'Take a new photo or choose one from your gallery.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                 ),
 
                 const SizedBox(height: 20),
@@ -111,7 +95,6 @@ class _MainShellState extends State<MainShell> {
                 // ==================================================
                 // TAKE PHOTO
                 // ==================================================
-
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
@@ -129,17 +112,11 @@ class _MainShellState extends State<MainShell> {
                   ),
                   title: const Text(
                     'Take Photo',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
                     'Use your phone camera',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                   ),
                   trailing: const Icon(
                     Icons.chevron_right_rounded,
@@ -148,25 +125,19 @@ class _MainShellState extends State<MainShell> {
                   onTap: () async {
                     Navigator.pop(bottomSheetContext);
 
-                    await _pickImage(
-                      ImageSource.camera,
-                    );
+                    await _pickImage(ImageSource.camera);
                   },
                 ),
 
                 const SizedBox(height: 4),
 
-                Divider(
-                  color: Colors.grey.shade200,
-                  height: 1,
-                ),
+                Divider(color: Colors.grey.shade200, height: 1),
 
                 const SizedBox(height: 4),
 
                 // ==================================================
                 // CHOOSE FROM GALLERY
                 // ==================================================
-
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
@@ -184,17 +155,11 @@ class _MainShellState extends State<MainShell> {
                   ),
                   title: const Text(
                     'Choose from Gallery',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
                     'Select an existing leaf photo',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
                   ),
                   trailing: const Icon(
                     Icons.chevron_right_rounded,
@@ -203,9 +168,7 @@ class _MainShellState extends State<MainShell> {
                   onTap: () async {
                     Navigator.pop(bottomSheetContext);
 
-                    await _pickImage(
-                      ImageSource.gallery,
-                    );
+                    await _pickImage(ImageSource.gallery);
                   },
                 ),
               ],
@@ -220,9 +183,7 @@ class _MainShellState extends State<MainShell> {
   // PICK IMAGE
   // ============================================================
 
-  Future<void> _pickImage(
-    ImageSource source,
-  ) async {
+  Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
@@ -238,18 +199,12 @@ class _MainShellState extends State<MainShell> {
 
       _handleSelectedImage(image);
     } catch (error) {
-      debugPrint(
-        'Image picker error: $error',
-      );
+      debugPrint('Image picker error: $error');
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to access camera or gallery.',
-          ),
-        ),
+        const SnackBar(content: Text('Unable to access camera or gallery.')),
       );
     }
   }
@@ -258,38 +213,9 @@ class _MainShellState extends State<MainShell> {
   // HANDLE SELECTED IMAGE
   // ============================================================
 
-  void _handleSelectedImage(
-    XFile image,
-  ) {
-    debugPrint(
-      'Selected image path: ${image.path}',
-    );
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Leaf photo selected successfully.',
-        ),
-        backgroundColor: Color(0xFF49784D),
-      ),
-    );
-
-    // ==========================================================
-    // NEXT STEP
-    // ==========================================================
-    //
-    // Later, this is where we will open your image preview page
-    // and show:
-    //
-    // Retake
-    // Scan Disease
-    //
-    // For now, the selected image is available through:
-    //
-    // image.path
-    //
+  void _handleSelectedImage(XFile image) {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => ScanPreviewPage(image: image)));
   }
 
   // ============================================================
@@ -303,26 +229,21 @@ class _MainShellState extends State<MainShell> {
       // HOME / DASHBOARD
       // ========================================================
 
-      DashboardPage(
-        onScanPressed: _openScanner,
-      ),
+      DashboardPage(onScanPressed: _openScanner),
 
       // ========================================================
       // COLLECTIONS
       // ========================================================
-
       const CollectionsPage(),
 
       // ========================================================
       // LEARN
       // ========================================================
-
       const LearnPage(),
 
       // ========================================================
       // PROFILE
       // ========================================================
-
       ProfilePage(
         onOpenCollections: () {
           _changePage(1);
@@ -336,16 +257,11 @@ class _MainShellState extends State<MainShell> {
       // ========================================================
       // PAGE CONTENT
       // ========================================================
-
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: pages),
 
       // ========================================================
       // BOTTOM NAVBAR
       // ========================================================
-
       bottomNavigationBar: BottomNavbar(
         selectedIndex: _selectedIndex,
         onItemSelected: _changePage,

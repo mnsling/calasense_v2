@@ -452,8 +452,6 @@ class _PersonalInformationPageState
   bool _isLoading = true;
   bool _isSaving = false;
 
-  String _originalUsername = '';
-
   @override
   void initState() {
     super.initState();
@@ -491,8 +489,6 @@ class _PersonalInformationPageState
 
       _usernameController.text = username;
       _emailController.text = user.email ?? '';
-
-      _originalUsername = username;
 
       setState(() {
         _isLoading = false;
@@ -550,8 +546,6 @@ class _PersonalInformationPageState
           .eq('id', user.id);
 
       if (!mounted) return;
-
-      _originalUsername = username;
 
       setState(() {
         _isSaving = false;
