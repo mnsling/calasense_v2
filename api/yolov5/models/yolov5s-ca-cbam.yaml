@@ -1,0 +1,59 @@
+# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# YOLOv5 with CoordAttention (CA) in backbone + CBAM in final outputs
+# No BiFPN — uses standard PANet/FPN structure
+
+# Parameters
+nc: 5 # number of classes
+depth_multiple: 0.33
+width_multiple: 0.50
+anchors:
+  - [10, 13, 16, 30, 33, 23] # P3/8
+  - [30, 61, 62, 45, 59, 119] # P4/16
+  - [116, 90, 156, 198, 373, 326] # P5/32
+
+# Backbone
+backbone: [
+    [-1, 1, Conv, [64, 6, 2, 2]], # 0-P1/2
+    [-1, 1, Conv, [128, 3, 2]], # 1-P2/4
+    [-1, 3, C3, [128]], # 2-plain C3 (keep details)
+    [-1, 1, Conv, [256, 3, 2]], # 3-P3/8
+    [-1, 6, C3, [256]], # 4-plain C3
+    [-1, 1, Conv, [512, 3, 2]], # 5-P4/16
+    [-1, 9, C3CA, [512]], # 6-C3 with CoordAttention (CA at P4)
+    [-1, 1, Conv, [1024, 3, 2]], # 7-P5/32
+    [-1, 3, C3CA, [1024]], # 8-C3 with CoordAttention (CA at P5)
+    [-1, 1, SPPF, [1024, 5]], # 9
+  ]
+
+# Neck / Head (PANet/FPN style)
+head: [
+    # P5 → upsample → fuse with P4
+    [-1, 1, Conv, [512, 1, 1]], # 10 reduce channels
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]], # 11 upsample
+    [[-1, 6], 1, Concat, [1]], # 12 concat with P4
+    [-1, 3, C3, [512]], # 13
+
+    # P4 → upsample → fuse with P3
+    [-1, 1, Conv, [256, 1, 1]], # 14 reduce channels
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]], # 15 upsample
+    [[-1, 4], 1, Concat, [1]], # 16 concat with P3
+    [-1, 3, C3, [256]], # 17
+
+    # Downsample path back to P4
+    [-1, 1, Conv, [256, 3, 2]], # 18 downsample
+    [[-1, 14], 1, Concat, [1]], # 19 concat with prev P4
+    [-1, 3, C3, [512]], # 20
+
+    # Downsample path back to P5
+    [-1, 1, Conv, [512, 3, 2]], # 21 downsample
+    [[-1, 10], 1, Concat, [1]], # 22 concat with prev P5
+    [-1, 3, C3, [1024]], # 23
+
+    # Apply CBAM only at final outputs (P3, P4, P5)
+    [17, 1, C3CBAM, [256]], # 24 CBAM on P3_out
+    [20, 1, C3CBAM, [512]], # 25 CBAM on P4_out
+    [23, 1, C3CBAM, [1024]], # 26 CBAM on P5_out
+
+    # Detection
+    [[24, 25, 26], 1, Detect, [nc, anchors]], # 27 Detect
+  ]

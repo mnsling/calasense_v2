@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/yolo_service.dart';
 import 'scaninfopage.dart';
 
 class ScanPreviewPage extends StatefulWidget {
@@ -57,9 +58,11 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Unable to open camera.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to open camera.'),
+        ),
+      );
     }
   }
 
@@ -74,28 +77,70 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
       _isScanning = true;
     });
 
-    // Temporary delay to simulate disease scanning.
-    // Remove this once the ML model is connected.
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final result = await YoloService.predict(_currentImage);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isScanning = false;
-    });
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No disease was detected. Try taking another photo.',
+            ),
+          ),
+        );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ScanInfoPage(
-          image: _currentImage,
-          onSave: () {
-            widget.onSaveScan(_currentImage);
-          },
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ScanInfoPage(
+            image: _currentImage,
+
+            // Main YOLO result
+            diseaseName: result.diseaseName,
+            confidence: result.confidence,
+
+            // All YOLO bounding boxes
+            detections: result.detections,
+
+            // Original image dimensions
+            imageWidth: result.imageWidth,
+            imageHeight: result.imageHeight,
+
+            onSave: () {
+              widget.onSaveScan(_currentImage);
+            },
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      debugPrint('YOLO scan error: $error');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to scan image: $error',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
+    }
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -107,14 +152,23 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
           // BACKGROUND
           // ======================================================
 
-          Image.asset('assets/images/bg2.png', fit: BoxFit.cover),
+          Image.asset(
+            'assets/images/bg2.png',
+            fit: BoxFit.cover,
+          ),
 
           // ======================================================
           // CONTENT
           // ======================================================
+
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 26, 24, 36),
+              padding: const EdgeInsets.fromLTRB(
+                24,
+                26,
+                24,
+                36,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -133,6 +187,7 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                   // ==================================================
                   // TITLE
                   // ==================================================
+
                   Text(
                     'Photo Captured!',
                     style: GoogleFonts.poppins(
@@ -150,7 +205,9 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                     'We’ve captured your calamansi leaf.\n'
                     'Would you like us to scan for diseases?',
                     style: GoogleFonts.poppins(
-                      color: Colors.white.withValues(alpha: 0.82),
+                      color: Colors.white.withValues(
+                        alpha: 0.82,
+                      ),
                       fontSize: 9.5,
                       fontWeight: FontWeight.w400,
                       letterSpacing: -0.25,
@@ -163,6 +220,7 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                   // ==================================================
                   // IMAGE
                   // ==================================================
+
                   ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: AspectRatio(
@@ -180,14 +238,24 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                   // ==================================================
                   // ACTION CARD
                   // ==================================================
+
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      14,
+                      16,
+                      14,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: Colors.white.withValues(
+                        alpha: 0.12,
+                      ),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.24),
+                        color: Colors.white.withValues(
+                          alpha: 0.24,
+                        ),
                       ),
                     ),
                     child: Column(
@@ -208,16 +276,22 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                         // ============================================
                         // SCAN
                         // ============================================
+
                         _ActionTile(
                           icon: Icons.search_rounded,
-                          title: _isScanning ? 'Scanning...' : 'Scan Diseases',
-                          subtitle: 'Analyze the leaf for possible diseases',
-                          onTap: _isScanning ? null : _scanDisease,
+                          title: _isScanning
+                              ? 'Scanning...'
+                              : 'Scan Diseases',
+                          subtitle:
+                              'Analyze the leaf for possible diseases',
+                          onTap:
+                              _isScanning ? null : _scanDisease,
                           trailing: _isScanning
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(
+                                  child:
+                                      CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Colors.white,
                                   ),
@@ -226,17 +300,21 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
                         ),
 
                         Divider(
-                          color: Colors.white.withValues(alpha: 0.14),
+                          color: Colors.white.withValues(
+                            alpha: 0.14,
+                          ),
                           height: 16,
                         ),
 
                         // ============================================
                         // RETAKE
                         // ============================================
+
                         _ActionTile(
                           icon: Icons.camera_alt_outlined,
                           title: 'Retake Photo',
-                          subtitle: 'Take a new photo for better results',
+                          subtitle:
+                              'Take a new photo for better results',
                           onTap: _retakePhoto,
                         ),
                       ],
@@ -259,7 +337,9 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
 class _BackButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _BackButton({required this.onTap});
+  const _BackButton({
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -270,7 +350,9 @@ class _BackButton extends StatelessWidget {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.82),
+          color: Colors.white.withValues(
+            alpha: 0.82,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Icon(
@@ -308,24 +390,33 @@ class _ActionTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(
+          vertical: 5,
+        ),
         child: Row(
           children: [
             Container(
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
+                color: Colors.white.withValues(
+                  alpha: 0.22,
+                ),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: Colors.white, size: 18),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 18,
+              ),
             ),
 
             const SizedBox(width: 11),
 
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
@@ -342,7 +433,9 @@ class _ActionTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: GoogleFonts.poppins(
-                      color: Colors.white.withValues(alpha: 0.68),
+                      color: Colors.white.withValues(
+                        alpha: 0.68,
+                      ),
                       fontSize: 7.5,
                       fontWeight: FontWeight.w400,
                       letterSpacing: -0.15,
@@ -352,7 +445,7 @@ class _ActionTile extends StatelessWidget {
               ),
             ),
 
-            ?trailing,
+            if (trailing != null) trailing!,
           ],
         ),
       ),

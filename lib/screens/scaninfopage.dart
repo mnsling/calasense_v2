@@ -6,12 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/yolo_service.dart';
+
 class ScanInfoPage extends StatelessWidget {
   final XFile? image;
   final String? imageUrl;
 
   final String diseaseName;
   final double confidence;
+
+  final List<YoloDetection> detections;
+  final double imageWidth;
+  final double imageHeight;
 
   final VoidCallback? onSave;
   final bool fromCollections;
@@ -22,28 +28,35 @@ class ScanInfoPage extends StatelessWidget {
     this.imageUrl,
     this.diseaseName = 'Leaf Miner',
     this.confidence = 92,
+    this.detections = const [],
+    this.imageWidth = 1,
+    this.imageHeight = 1,
     this.onSave,
     this.fromCollections = false,
   });
 
-  Widget _buildScanImage() {
-    // Fresh scan from camera or gallery
+  // ============================================================
+  // ORIGINAL IMAGE
+  // ============================================================
+
+  Widget _buildRawImage({
+    BoxFit fit = BoxFit.contain,
+  }) {
     if (image != null) {
       return Image.file(
         File(image!.path),
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: fit,
       );
     }
 
-    // Saved scan loaded from Supabase
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       return Image.network(
         imageUrl!,
         width: double.infinity,
         height: double.infinity,
-        fit: BoxFit.cover,
+        fit: fit,
         errorBuilder: (_, _, _) {
           return Container(
             color: Colors.grey.shade200,
@@ -59,7 +72,6 @@ class ScanInfoPage extends StatelessWidget {
       );
     }
 
-    // Fallback
     return Container(
       color: Colors.grey.shade200,
       child: const Center(
@@ -71,6 +83,84 @@ class ScanInfoPage extends StatelessWidget {
       ),
     );
   }
+
+  // ============================================================
+  // IMAGE + YOLO BOUNDING BOXES
+  // ============================================================
+
+  Widget _buildDetectionImage({
+    bool showFullscreenIcon = true,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildRawImage(
+              fit: BoxFit.contain,
+            ),
+
+            if (detections.isNotEmpty &&
+                imageWidth > 0 &&
+                imageHeight > 0)
+              IgnorePointer(
+                child: CustomPaint(
+                  painter: _BoundingBoxPainter(
+                    detections: detections,
+                    imageWidth: imageWidth,
+                    imageHeight: imageHeight,
+                  ),
+                ),
+              ),
+
+            if (showFullscreenIcon)
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(
+                      alpha: 0.60,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.fullscreen_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ============================================================
+  // FULLSCREEN IMAGE
+  // ============================================================
+
+  void _openFullScreenImage(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _FullScreenScanImage(
+          image: image,
+          imageUrl: imageUrl,
+          detections: detections,
+          imageWidth: imageWidth,
+          imageHeight: imageHeight,
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +196,10 @@ class ScanInfoPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ==================================================
                   // BACK BUTTON
+                  // ==================================================
+
                   GestureDetector(
                     onTap: () {
                       Navigator.pop(context);
@@ -118,8 +211,7 @@ class ScanInfoPage extends StatelessWidget {
                         color: Colors.white.withValues(
                           alpha: 0.85,
                         ),
-                        borderRadius:
-                            BorderRadius.circular(13),
+                        borderRadius: BorderRadius.circular(13),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(
@@ -139,7 +231,10 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
+                  // ==================================================
                   // RESULT HEADER
+                  // ==================================================
+
                   Text(
                     'Scan Result',
                     style: GoogleFonts.poppins(
@@ -180,20 +275,40 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
+                  // ==================================================
                   // PHOTO + DETAILS
+                  // ==================================================
+
                   SizedBox(
                     height: 170,
                     child: Row(
                       children: [
+                        // ============================================
+                        // CLICKABLE DETECTION IMAGE
+                        // ============================================
+
                         Expanded(
-                          child: ClipRRect(
-                            borderRadius:
-                                BorderRadius.circular(14),
-                            child: _buildScanImage(),
+                          child: GestureDetector(
+                            onTap: () {
+                              _openFullScreenImage(context);
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                color: Colors.black.withValues(
+                                  alpha: 0.12,
+                                ),
+                                child: _buildDetectionImage(),
+                              ),
+                            ),
                           ),
                         ),
 
                         const SizedBox(width: 10),
+
+                        // ============================================
+                        // DETAILS
+                        // ============================================
 
                         Expanded(
                           child: Column(
@@ -208,20 +323,17 @@ class ScanInfoPage extends StatelessWidget {
                                     children: [
                                       Text(
                                         'Confidence Score',
-                                        style:
-                                            GoogleFonts.poppins(
-                                          color: Colors.white
-                                              .withValues(
+                                        style: GoogleFonts.poppins(
+                                          color:
+                                              Colors.white.withValues(
                                             alpha: 0.75,
                                           ),
                                           fontSize: 8,
                                         ),
                                       ),
-
                                       Text(
                                         '${confidence.toStringAsFixed(0)}%',
-                                        style:
-                                            GoogleFonts.poppins(
+                                        style: GoogleFonts.poppins(
                                           color: Colors.white,
                                           fontSize: 25,
                                           fontWeight:
@@ -246,10 +358,9 @@ class ScanInfoPage extends StatelessWidget {
                                     children: [
                                       Text(
                                         'Scan Details',
-                                        style:
-                                            GoogleFonts.poppins(
-                                          color: Colors.white
-                                              .withValues(
+                                        style: GoogleFonts.poppins(
+                                          color:
+                                              Colors.white.withValues(
                                             alpha: 0.75,
                                           ),
                                           fontSize: 8,
@@ -259,9 +370,10 @@ class ScanInfoPage extends StatelessWidget {
                                       const SizedBox(height: 7),
 
                                       Text(
-                                        'Placeholder scan',
-                                        style:
-                                            GoogleFonts.poppins(
+                                        detections.isEmpty
+                                            ? 'No bounding boxes'
+                                            : '${detections.length} detection${detections.length == 1 ? '' : 's'}',
+                                        style: GoogleFonts.poppins(
                                           color: Colors.white,
                                           fontSize: 7.5,
                                           fontWeight:
@@ -272,11 +384,10 @@ class ScanInfoPage extends StatelessWidget {
                                       const SizedBox(height: 3),
 
                                       Text(
-                                        'Location unavailable',
-                                        style:
-                                            GoogleFonts.poppins(
-                                          color: Colors.white
-                                              .withValues(
+                                        'Tap image to enlarge',
+                                        style: GoogleFonts.poppins(
+                                          color:
+                                              Colors.white.withValues(
                                             alpha: 0.75,
                                           ),
                                           fontSize: 7,
@@ -295,7 +406,10 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
+                  // ==================================================
                   // DEFINITION
+                  // ==================================================
+
                   const _InfoCard(
                     icon: Icons.crop_free_rounded,
                     title: 'Definition',
@@ -304,7 +418,10 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
+                  // ==================================================
                   // SYMPTOMS
+                  // ==================================================
+
                   const _InfoCard(
                     icon: Icons.warning_amber_rounded,
                     title: 'Symptoms',
@@ -313,7 +430,10 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
+                  // ==================================================
                   // TREATMENT
+                  // ==================================================
+
                   const _InfoCard(
                     icon: Icons.monitor_heart_outlined,
                     title: 'Treatment',
@@ -322,7 +442,10 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 22),
 
+                  // ==================================================
                   // BOTTOM BUTTON
+                  // ==================================================
+
                   SizedBox(
                     width: double.infinity,
                     height: 46,
@@ -352,17 +475,14 @@ class ScanInfoPage extends StatelessWidget {
                                 : Icons.bookmark_add_rounded,
                             size: 17,
                           ),
-
                           const SizedBox(width: 7),
-
                           Text(
                             fromCollections
                                 ? 'Back to Collections'
                                 : 'Save to Collections',
                             style: GoogleFonts.poppins(
                               fontSize: 10,
-                              fontWeight:
-                                  FontWeight.w500,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -378,6 +498,353 @@ class ScanInfoPage extends StatelessWidget {
     );
   }
 }
+
+// =================================================================
+// FULLSCREEN IMAGE VIEWER
+// =================================================================
+
+class _FullScreenScanImage extends StatelessWidget {
+  final XFile? image;
+  final String? imageUrl;
+
+  final List<YoloDetection> detections;
+
+  final double imageWidth;
+  final double imageHeight;
+
+  const _FullScreenScanImage({
+    required this.image,
+    required this.imageUrl,
+    required this.detections,
+    required this.imageWidth,
+    required this.imageHeight,
+  });
+
+  Widget _buildImage() {
+    if (image != null) {
+      return Image.file(
+        File(image!.path),
+        fit: BoxFit.contain,
+      );
+    }
+
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return Image.network(
+        imageUrl!,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) {
+          return const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 50,
+            ),
+          );
+        },
+      );
+    }
+
+    return const Center(
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.white54,
+        size: 50,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final validDimensions =
+        imageWidth > 0 && imageHeight > 0;
+
+    final aspectRatio = validDimensions
+        ? imageWidth / imageHeight
+        : 1.0;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 6,
+                boundaryMargin:
+                    const EdgeInsets.all(80),
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: aspectRatio,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildImage(),
+
+                        if (detections.isNotEmpty &&
+                            validDimensions)
+                          IgnorePointer(
+                            child: CustomPaint(
+                              painter:
+                                  _BoundingBoxPainter(
+                                detections: detections,
+                                imageWidth: imageWidth,
+                                imageHeight:
+                                    imageHeight,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
+              top: 12,
+              left: 12,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(
+                      alpha: 0.65,
+                    ),
+                    borderRadius:
+                        BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(
+                        alpha: 0.18,
+                      ),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 18,
+              child: Center(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(
+                      alpha: 0.60,
+                    ),
+                    borderRadius:
+                        BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Pinch to zoom • Drag to move',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =================================================================
+// YOLO BOUNDING BOX PAINTER
+// =================================================================
+
+class _BoundingBoxPainter extends CustomPainter {
+  final List<YoloDetection> detections;
+
+  final double imageWidth;
+  final double imageHeight;
+
+  _BoundingBoxPainter({
+    required this.detections,
+    required this.imageWidth,
+    required this.imageHeight,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (imageWidth <= 0 || imageHeight <= 0) {
+      return;
+    }
+
+    // -------------------------------------------------------------
+    // BoxFit.contain scaling
+    // -------------------------------------------------------------
+
+    final scaleX = size.width / imageWidth;
+    final scaleY = size.height / imageHeight;
+
+    final scale =
+        scaleX < scaleY ? scaleX : scaleY;
+
+    final displayedWidth =
+        imageWidth * scale;
+
+    final displayedHeight =
+        imageHeight * scale;
+
+    final offsetX =
+        (size.width - displayedWidth) / 2;
+
+    final offsetY =
+        (size.height - displayedHeight) / 2;
+
+    // -------------------------------------------------------------
+    // DRAW EACH DETECTION
+    // -------------------------------------------------------------
+
+    for (final detection in detections) {
+      final left =
+          offsetX + (detection.xmin * scale);
+
+      final top =
+          offsetY + (detection.ymin * scale);
+
+      final right =
+          offsetX + (detection.xmax * scale);
+
+      final bottom =
+          offsetY + (detection.ymax * scale);
+
+      final rect = Rect.fromLTRB(
+        left,
+        top,
+        right,
+        bottom,
+      );
+
+      // -----------------------------------------------------------
+      // BOUNDING BOX
+      // -----------------------------------------------------------
+
+      final boxPaint = Paint()
+        ..color = const Color(0xFF7CFF78)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5;
+
+      canvas.drawRect(
+        rect,
+        boxPaint,
+      );
+
+      // -----------------------------------------------------------
+      // LABEL
+      // -----------------------------------------------------------
+
+      final label =
+          '${detection.className} '
+          '${detection.confidence.toStringAsFixed(0)}%';
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      );
+
+      textPainter.layout();
+
+      const horizontalPadding = 6.0;
+      const verticalPadding = 4.0;
+
+      final labelWidth =
+          textPainter.width +
+              (horizontalPadding * 2);
+
+      final labelHeight =
+          textPainter.height +
+              (verticalPadding * 2);
+
+      var labelLeft = left;
+
+      if (labelLeft + labelWidth >
+          size.width) {
+        labelLeft =
+            size.width - labelWidth;
+      }
+
+      if (labelLeft < 0) {
+        labelLeft = 0;
+      }
+
+      var labelTop =
+          top - labelHeight;
+
+      if (labelTop < 0) {
+        labelTop = top;
+      }
+
+      final labelRect = Rect.fromLTWH(
+        labelLeft,
+        labelTop,
+        labelWidth,
+        labelHeight,
+      );
+
+      final labelPaint = Paint()
+        ..color = const Color(0xDD1B4D26)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          labelRect,
+          const Radius.circular(4),
+        ),
+        labelPaint,
+      );
+
+      textPainter.paint(
+        canvas,
+        Offset(
+          labelLeft + horizontalPadding,
+          labelTop + verticalPadding,
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(
+    covariant _BoundingBoxPainter oldDelegate,
+  ) {
+    return oldDelegate.detections != detections ||
+        oldDelegate.imageWidth != imageWidth ||
+        oldDelegate.imageHeight != imageHeight;
+  }
+}
+
+// =================================================================
+// SMALL INFO CARD
+// =================================================================
 
 class _SmallInfoCard extends StatelessWidget {
   final Widget child;
@@ -407,6 +874,10 @@ class _SmallInfoCard extends StatelessWidget {
   }
 }
 
+// =================================================================
+// INFO CARD
+// =================================================================
+
 class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -435,7 +906,8 @@ class _InfoCard extends StatelessWidget {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -451,7 +923,8 @@ class _InfoCard extends StatelessWidget {
                 ),
                 child: Icon(
                   icon,
-                  color: const Color(0xFF587A59),
+                  color:
+                      const Color(0xFF587A59),
                   size: 17,
                 ),
               ),

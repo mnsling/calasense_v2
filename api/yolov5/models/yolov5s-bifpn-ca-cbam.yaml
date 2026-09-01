@@ -1,0 +1,45 @@
+# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# YOLOv5 with BiFPN + CA (backbone) + CBAM (head)
+# yolov5s-bifpn-ca-cbam.yaml  (BiFPN kept identical to your baseline preset)
+
+# Parameters
+nc: 5 # number of classes
+depth_multiple: 0.33
+width_multiple: 0.50
+anchors:
+  - [10, 13, 16, 30, 33, 23] # P3/8
+  - [30, 61, 62, 45, 59, 119] # P4/16
+  - [116, 90, 156, 198, 373, 326] # P5/32
+
+# Backbone (insert CA in the backbone as you planned)
+backbone: [
+    [-1, 1, Conv, [64, 6, 2, 2]],
+    [-1, 1, Conv, [128, 3, 2]],
+    [-1, 3, C3CA, [128]],
+    [-1, 1, Conv, [256, 3, 2]],
+    [-1, 6, C3CA, [256]],
+    [-1, 1, Conv, [512, 3, 2]],
+    [-1, 9, C3CBAM, [512]], # head-style attention in deeper layers
+    [-1, 1, Conv, [1024, 3, 2]],
+    [-1, 3, C3CBAM, [1024]],
+    [-1, 1, SPPF, [1024, 5]],
+  ]
+
+# Head (BiFPN kept same as your baseline; C3CBAM uses BiFPN outputs 256/512/512)
+head: [
+    # BiFPN consumes P3,P4,P5 = [6,8,9]
+    [[6, 8, 9], 1, BiFPN, [[256, 512, 512], [256, 512, 512], 2, True]],
+
+    # Get fused outputs
+    [10, 1, GetItem, [0, 256]],
+    [10, 1, GetItem, [1, 512]],
+    [10, 1, GetItem, [2, 512]],
+
+    # Attention-augmented C3 in head
+    [11, 1, C3CA, [256]],
+    [12, 1, C3CBAM, [512]],
+    [13, 1, C3CBAM, [512]],
+
+    # Detect
+    [[14, 15, 16], 1, Detect, [nc, anchors]],
+  ]
