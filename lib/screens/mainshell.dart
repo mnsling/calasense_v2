@@ -1,11 +1,16 @@
 // lib/screens/main_shell.dart
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/bottomnavbar.dart';
+import '../data/disease_info.dart';
+import '../services/yolo_service.dart';
 import 'scanpreviewpage.dart';
 import 'dashboardpage.dart';
 import 'collectionspage.dart';
@@ -30,10 +35,102 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+  // ============================================================
+  // DRAW BOUNDING BOXES ONTO THE IMAGE FILE ITSELF
+  // ============================================================
+
+  Future<Uint8List?> _renderAnnotatedImage({
+    required XFile image,
+    required List<YoloDetection> detections,
+  }) async {
+    if (detections.isEmpty) return null;
+
+    final bytes = await image.readAsBytes();
+    final decoded = img.decodeImage(bytes);
+
+    if (decoded == null) return null;
+
+    // Scale stroke width and font size to the actual photo resolution.
+    // A fixed pixel size looks fine on a 400px preview but becomes
+    // invisible on a 2000px camera photo.
+    final referenceSize =
+        decoded.width < decoded.height ? decoded.width : decoded.height;
+
+    final thickness = (referenceSize / 120).round().clamp(4, 20);
+
+    final img.BitmapFont font = referenceSize >= 1000
+        ? img.arial48
+        : referenceSize >= 500
+            ? img.arial24
+            : img.arial14;
+
+    final boxColor = img.ColorRgb8(124, 255, 120);
+
+    // Opaque color, not alpha-blended: fillRect on a JPEG decoded
+    // without an alpha channel can silently drop alpha-blended fills
+    // in some versions of the image package, leaving the label
+    // background invisible even though the call succeeds.
+    final labelBgColor = img.ColorRgb8(27, 77, 38);
+    final labelTextColor = img.ColorRgb8(255, 255, 255);
+
+    for (final detection in detections) {
+      final x1 = detection.xmin.round().clamp(0, decoded.width - 1);
+      final y1 = detection.ymin.round().clamp(0, decoded.height - 1);
+      final x2 = detection.xmax.round().clamp(0, decoded.width - 1);
+      final y2 = detection.ymax.round().clamp(0, decoded.height - 1);
+
+      img.drawRect(
+        decoded,
+        x1: x1,
+        y1: y1,
+        x2: x2,
+        y2: y2,
+        color: boxColor,
+        thickness: thickness,
+      );
+
+      final label =
+          '${detection.className} ${detection.confidence.toStringAsFixed(0)}%';
+
+      final labelHeight = font.lineHeight + 16;
+      final labelWidth = (label.length * font.lineHeight * 0.62).round() + 20;
+
+      // Prefer placing the label above the box; if there's no room,
+      // place it just inside the top edge instead.
+      final labelTop = y1 - labelHeight >= 0 ? y1 - labelHeight : y1;
+
+      final labelLeft =
+          (x1 + labelWidth > decoded.width) ? decoded.width - labelWidth : x1;
+
+      img.fillRect(
+        decoded,
+        x1: labelLeft.clamp(0, decoded.width - 1),
+        y1: labelTop.clamp(0, decoded.height - 1),
+        x2: (labelLeft + labelWidth).clamp(0, decoded.width - 1),
+        y2: (labelTop + labelHeight).clamp(0, decoded.height - 1),
+        color: labelBgColor,
+      );
+
+      img.drawString(
+        decoded,
+        label,
+        font: font,
+        x: labelLeft.clamp(0, decoded.width - 1) + 8,
+        y: labelTop.clamp(0, decoded.height - 1) + 6,
+        color: labelTextColor,
+      );
+    }
+
+    return Uint8List.fromList(img.encodePng(decoded));
+  }
+
   Future<void> _saveScanToSupabase({
     required XFile image,
     required String diseaseType,
     required double confidence,
+    required List<YoloDetection> detections,
+    required double imageWidth,
+    required double imageHeight,
   }) async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -56,12 +153,57 @@ class _MainShellState extends State<MainShell> {
           .from('scan-images')
           .getPublicUrl(filePath);
 
+      // Draw bounding boxes onto a copy of the image and upload it
+      String? annotatedImageUrl;
+
+      final annotatedBytes = await _renderAnnotatedImage(
+        image: image,
+        detections: detections,
+      );
+
+      if (annotatedBytes != null) {
+        final annotatedFilePath =
+            '${user.id}/${DateTime.now().millisecondsSinceEpoch}_annotated.png';
+
+        await supabase.storage.from('scan-images').uploadBinary(
+              annotatedFilePath,
+              annotatedBytes,
+              fileOptions: const FileOptions(contentType: 'image/png'),
+            );
+
+        annotatedImageUrl = supabase.storage
+            .from('scan-images')
+            .getPublicUrl(annotatedFilePath);
+      }
+
+      final info = getDiseaseInfo(diseaseType);
+
+      final detectionsJson = jsonEncode(
+        detections
+            .map((detection) => {
+                  'class_name': detection.className,
+                  'confidence': detection.confidence,
+                  'xmin': detection.xmin,
+                  'ymin': detection.ymin,
+                  'xmax': detection.xmax,
+                  'ymax': detection.ymax,
+                })
+            .toList(),
+      );
+
       // Save scan information
       await supabase.from('scans').insert({
         'user_id': user.id,
         'image_url': imageUrl,
+        'annotated_image_url': annotatedImageUrl ?? imageUrl,
         'disease_type': diseaseType,
         'confidence': confidence,
+        'definition': info.definition,
+        'symptoms': info.symptoms,
+        'treatment': info.treatment,
+        'detections': detectionsJson,
+        'image_width': imageWidth,
+        'image_height': imageHeight,
       });
 
       if (!mounted) return;
@@ -253,11 +395,21 @@ class _MainShellState extends State<MainShell> {
       MaterialPageRoute(
         builder: (_) => ScanPreviewPage(
           image: image,
-          onSaveScan: (selectedImage) {
+          onSaveScan: ({
+            required XFile image,
+            required String diseaseName,
+            required double confidence,
+            required List<YoloDetection> detections,
+            required double imageWidth,
+            required double imageHeight,
+          }) {
             _saveScanToSupabase(
-              image: selectedImage,
-              diseaseType: 'Leaf Miner',
-              confidence: 92,
+              image: image,
+              diseaseType: diseaseName,
+              confidence: confidence,
+              detections: detections,
+              imageWidth: imageWidth,
+              imageHeight: imageHeight,
             );
           },
         ),
@@ -273,7 +425,12 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final pages = [
       // HOME
-      DashboardPage(onScanPressed: _openScanner),
+      DashboardPage(
+        onScanPressed: _openScanner,
+        onOpenCollections: () {
+          _changePage(1);
+        },
+      ),
 
       // COLLECTIONS
       const CollectionsPage(),

@@ -1,5 +1,7 @@
 // lib/screens/collectionspage.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,13 +35,15 @@ class _CollectionsPageState extends State<CollectionsPage> {
 
   List<Map<String, dynamic>> scans = [];
 
+  StreamSubscription<List<Map<String, dynamic>>>? _scansSubscription;
+
   @override
   void initState() {
     super.initState();
-    _loadScans();
+    _subscribeToScans();
   }
 
-  Future<void> _loadScans() async {
+  void _subscribeToScans() {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
@@ -54,39 +58,61 @@ class _CollectionsPageState extends State<CollectionsPage> {
       return;
     }
 
-    try {
-      final response = await supabase
-          .from('scans')
-          .select()
-          .eq('user_id', user.id)
-          .order(
-            'scanned_at',
-            ascending: false,
-          );
+    _scansSubscription?.cancel();
 
-      if (!mounted) return;
+    debugPrint('Subscribing to scans stream for user: ${user.id}');
 
-      setState(() {
-        scans = List<Map<String, dynamic>>.from(response);
-        isLoading = false;
-      });
-    } catch (error) {
-      debugPrint('Load scans error: $error');
+    _scansSubscription = supabase
+        .from('scans')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', user.id)
+        .order('scanned_at', ascending: false)
+        .listen(
+          (data) {
+            debugPrint('Scans stream emitted ${data.length} row(s)');
 
-      if (!mounted) return;
+            if (!mounted) return;
 
-      setState(() {
-        isLoading = false;
-      });
+            setState(() {
+              scans = List<Map<String, dynamic>>.from(data);
+              isLoading = false;
+            });
+          },
+          onError: (error) {
+            debugPrint('Scans stream error: $error');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to load scans: $error',
-          ),
-        ),
-      );
-    }
+            if (!mounted) return;
+
+            setState(() {
+              isLoading = false;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Unable to load scans: $error',
+                ),
+              ),
+            );
+          },
+        );
+  }
+
+  Future<void> _loadScans() async {
+    // Used by RefreshIndicator's pull-to-refresh gesture.
+    // The stream keeps data current on its own; this re-subscribes
+    // in case the connection dropped.
+    setState(() {
+      isLoading = true;
+    });
+
+    _subscribeToScans();
+  }
+
+  @override
+  void dispose() {
+    _scansSubscription?.cancel();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> get filteredScans {
@@ -253,18 +279,33 @@ class _CollectionsPageState extends State<CollectionsPage> {
                             color: Colors.white,
                           ),
                         )
-                      : visibleScans.isEmpty
-                          ? const EmptyCollectionsState()
-                          : RefreshIndicator(
-                              onRefresh: _loadScans,
-                              child: isGridView
+                      : RefreshIndicator(
+                          onRefresh: _loadScans,
+                          child: visibleScans.isEmpty
+                              ? LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    return SingleChildScrollView(
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: constraints.maxHeight,
+                                        ),
+                                        child: const Center(
+                                          child: EmptyCollectionsState(),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : isGridView
                                   ? _GridCollectionView(
                                       scans: visibleScans,
                                     )
                                   : _ListCollectionView(
                                       scans: visibleScans,
                                     ),
-                            ),
+                        ),
                 ),
               ],
             ),
@@ -337,8 +378,17 @@ class _CollectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String imageUrl =
+    final String annotatedUrl =
+        scan['annotated_image_url']?.toString() ?? '';
+
+    final String plainUrl =
         scan['image_url']?.toString() ?? '';
+
+    final String imageUrl =
+        annotatedUrl.isNotEmpty ? annotatedUrl : plainUrl;
+
+    final DateTime? scannedAt =
+        DateTime.tryParse(scan['scanned_at']?.toString() ?? '');
 
     final String disease =
         scan['disease_type']?.toString() ?? 'Unknown';
@@ -362,6 +412,7 @@ class _CollectionCard extends StatelessWidget {
               diseaseName: disease,
               confidence: confidence,
               fromCollections: true,
+              scannedAt: scannedAt,
             ),
           ),
         );
@@ -420,7 +471,7 @@ class _CollectionCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
                       color: const Color(0xFF315B34),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.2,
                     ),
@@ -432,7 +483,7 @@ class _CollectionCard extends StatelessWidget {
                     '${confidence.toStringAsFixed(0)}% confidence',
                     style: GoogleFonts.poppins(
                       color: Colors.grey.shade600,
-                      fontSize: 7.5,
+                      fontSize: 10,
                       letterSpacing: -0.15,
                     ),
                   ),
@@ -455,8 +506,17 @@ class _CollectionListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String imageUrl =
+    final String annotatedUrl =
+        scan['annotated_image_url']?.toString() ?? '';
+
+    final String plainUrl =
         scan['image_url']?.toString() ?? '';
+
+    final String imageUrl =
+        annotatedUrl.isNotEmpty ? annotatedUrl : plainUrl;
+
+    final DateTime? scannedAt =
+        DateTime.tryParse(scan['scanned_at']?.toString() ?? '');
 
     final String disease =
         scan['disease_type']?.toString() ?? 'Unknown';
@@ -480,6 +540,7 @@ class _CollectionListCard extends StatelessWidget {
               diseaseName: disease,
               confidence: confidence,
               fromCollections: true,
+              scannedAt: scannedAt,
             ),
           ),
         );
@@ -536,7 +597,7 @@ class _CollectionListCard extends StatelessWidget {
                     disease,
                     style: GoogleFonts.poppins(
                       color: const Color(0xFF315B34),
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -547,7 +608,7 @@ class _CollectionListCard extends StatelessWidget {
                     '${confidence.toStringAsFixed(0)}% confidence',
                     style: GoogleFonts.poppins(
                       color: Colors.grey.shade600,
-                      fontSize: 8,
+                      fontSize: 10,
                     ),
                   ),
                 ],

@@ -6,7 +6,25 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../data/disease_info.dart';
 import '../services/yolo_service.dart';
+
+String _formatScanDate(DateTime date) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  final local = date.toLocal();
+  final month = months[local.month - 1];
+
+  final hour24 = local.hour;
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  final period = hour24 < 12 ? 'AM' : 'PM';
+  final minute = local.minute.toString().padLeft(2, '0');
+
+  return '$month ${local.day}, ${local.year} · $hour12:$minute $period';
+}
 
 class ScanInfoPage extends StatelessWidget {
   final XFile? image;
@@ -21,6 +39,7 @@ class ScanInfoPage extends StatelessWidget {
 
   final VoidCallback? onSave;
   final bool fromCollections;
+  final DateTime? scannedAt;
 
   const ScanInfoPage({
     super.key,
@@ -33,21 +52,20 @@ class ScanInfoPage extends StatelessWidget {
     this.imageHeight = 1,
     this.onSave,
     this.fromCollections = false,
+    this.scannedAt,
   });
 
   // ============================================================
-  // ORIGINAL IMAGE
+  // ORIGINAL IMAGE (always cover)
   // ============================================================
 
-  Widget _buildRawImage({
-    BoxFit fit = BoxFit.contain,
-  }) {
+  Widget _buildRawImage() {
     if (image != null) {
       return Image.file(
         File(image!.path),
         width: double.infinity,
         height: double.infinity,
-        fit: fit,
+        fit: BoxFit.cover,
       );
     }
 
@@ -56,7 +74,7 @@ class ScanInfoPage extends StatelessWidget {
         imageUrl!,
         width: double.infinity,
         height: double.infinity,
-        fit: fit,
+        fit: BoxFit.cover,
         errorBuilder: (_, _, _) {
           return Container(
             color: Colors.grey.shade200,
@@ -88,54 +106,43 @@ class ScanInfoPage extends StatelessWidget {
   // IMAGE + YOLO BOUNDING BOXES
   // ============================================================
 
-  Widget _buildDetectionImage({
-    bool showFullscreenIcon = true,
-  }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            _buildRawImage(
-              fit: BoxFit.contain,
+  Widget _buildDetectionImage() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildRawImage(),
+
+        if (detections.isNotEmpty &&
+            imageWidth > 0 &&
+            imageHeight > 0)
+          IgnorePointer(
+            child: CustomPaint(
+              painter: _BoundingBoxPainter(
+                detections: detections,
+                imageWidth: imageWidth,
+                imageHeight: imageHeight,
+              ),
             ),
+          ),
 
-            if (detections.isNotEmpty &&
-                imageWidth > 0 &&
-                imageHeight > 0)
-              IgnorePointer(
-                child: CustomPaint(
-                  painter: _BoundingBoxPainter(
-                    detections: detections,
-                    imageWidth: imageWidth,
-                    imageHeight: imageHeight,
-                  ),
-                ),
-              ),
-
-            if (showFullscreenIcon)
-              Positioned(
-                right: 8,
-                bottom: 8,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(
-                      alpha: 0.60,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.fullscreen_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
+        Positioned(
+          right: 8,
+          bottom: 8,
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.60),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.fullscreen_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -164,17 +171,11 @@ class ScanInfoPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const definition =
-        'Leaf Miners are tiny insects that burrow inside the leaf '
-        'tissue, causing visible trails and damage.';
+    final info = getDiseaseInfo(diseaseName);
 
-    const symptoms =
-        'Winding, irregular trails on the leaf surface, yellowing or '
-        'pale patches, and distorted growth in severe cases.';
-
-    const treatment =
-        'Remove affected leaves, use neem oil or approved pesticide, '
-        'and monitor regularly for new signs.';
+    final definition = info.definition;
+    final symptoms = info.symptoms;
+    final treatment = info.treatment;
 
     return Scaffold(
       body: Stack(
@@ -187,19 +188,11 @@ class ScanInfoPage extends StatelessWidget {
 
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                24,
-                28,
-                24,
-                35,
-              ),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 35),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ==================================================
-                  // BACK BUTTON
-                  // ==================================================
-
+                  // Back button
                   GestureDetector(
                     onTap: () {
                       Navigator.pop(context);
@@ -208,15 +201,11 @@ class ScanInfoPage extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(
-                          alpha: 0.85,
-                        ),
+                        color: Colors.white.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(13),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(
-                              alpha: 0.12,
-                            ),
+                            color: Colors.black.withValues(alpha: 0.12),
                             blurRadius: 6,
                             offset: const Offset(0, 3),
                           ),
@@ -231,16 +220,11 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 28),
 
-                  // ==================================================
-                  // RESULT HEADER
-                  // ==================================================
-
+                  // Result header
                   Text(
                     'Scan Result',
                     style: GoogleFonts.poppins(
-                      color: Colors.white.withValues(
-                        alpha: 0.8,
-                      ),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 9,
                       fontWeight: FontWeight.w500,
                     ),
@@ -265,9 +249,7 @@ class ScanInfoPage extends StatelessWidget {
                     "We've identified signs of $diseaseName\n"
                     'on your calamansi leaf.',
                     style: GoogleFonts.poppins(
-                      color: Colors.white.withValues(
-                        alpha: 0.82,
-                      ),
+                      color: Colors.white.withValues(alpha: 0.82),
                       fontSize: 9.5,
                       height: 1.35,
                     ),
@@ -275,18 +257,11 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // ==================================================
-                  // PHOTO + DETAILS
-                  // ==================================================
-
+                  // Photo + details
                   SizedBox(
                     height: 170,
                     child: Row(
                       children: [
-                        // ============================================
-                        // CLICKABLE DETECTION IMAGE
-                        // ============================================
-
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
@@ -295,9 +270,7 @@ class ScanInfoPage extends StatelessWidget {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
-                                color: Colors.black.withValues(
-                                  alpha: 0.12,
-                                ),
+                                color: Colors.black.withValues(alpha: 0.12),
                                 child: _buildDetectionImage(),
                               ),
                             ),
@@ -305,10 +278,6 @@ class ScanInfoPage extends StatelessWidget {
                         ),
 
                         const SizedBox(width: 10),
-
-                        // ============================================
-                        // DETAILS
-                        // ============================================
 
                         Expanded(
                           child: Column(
@@ -324,11 +293,9 @@ class ScanInfoPage extends StatelessWidget {
                                       Text(
                                         'Confidence Score',
                                         style: GoogleFonts.poppins(
-                                          color:
-                                              Colors.white.withValues(
-                                            alpha: 0.75,
-                                          ),
-                                          fontSize: 8,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.75),
+                                          fontSize: 10,
                                         ),
                                       ),
                                       Text(
@@ -336,8 +303,7 @@ class ScanInfoPage extends StatelessWidget {
                                         style: GoogleFonts.poppins(
                                           color: Colors.white,
                                           fontSize: 25,
-                                          fontWeight:
-                                              FontWeight.w700,
+                                          fontWeight: FontWeight.w700,
                                           letterSpacing: -0.8,
                                         ),
                                       ),
@@ -359,25 +325,24 @@ class ScanInfoPage extends StatelessWidget {
                                       Text(
                                         'Scan Details',
                                         style: GoogleFonts.poppins(
-                                          color:
-                                              Colors.white.withValues(
-                                            alpha: 0.75,
-                                          ),
-                                          fontSize: 8,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.75),
+                                          fontSize: 10,
                                         ),
                                       ),
 
                                       const SizedBox(height: 7),
 
                                       Text(
-                                        detections.isEmpty
-                                            ? 'No bounding boxes'
-                                            : '${detections.length} detection${detections.length == 1 ? '' : 's'}',
+                                        scannedAt != null
+                                            ? _formatScanDate(scannedAt!)
+                                            : detections.isEmpty
+                                                ? 'No bounding boxes'
+                                                : '${detections.length} detection${detections.length == 1 ? '' : 's'}',
                                         style: GoogleFonts.poppins(
                                           color: Colors.white,
-                                          fontSize: 7.5,
-                                          fontWeight:
-                                              FontWeight.w500,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
 
@@ -386,11 +351,9 @@ class ScanInfoPage extends StatelessWidget {
                                       Text(
                                         'Tap image to enlarge',
                                         style: GoogleFonts.poppins(
-                                          color:
-                                              Colors.white.withValues(
-                                            alpha: 0.75,
-                                          ),
-                                          fontSize: 7,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.75),
+                                          fontSize: 10,
                                         ),
                                       ),
                                     ],
@@ -406,11 +369,7 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  // ==================================================
-                  // DEFINITION
-                  // ==================================================
-
-                  const _InfoCard(
+                  _InfoCard(
                     icon: Icons.crop_free_rounded,
                     title: 'Definition',
                     description: definition,
@@ -418,11 +377,7 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // ==================================================
-                  // SYMPTOMS
-                  // ==================================================
-
-                  const _InfoCard(
+                  _InfoCard(
                     icon: Icons.warning_amber_rounded,
                     title: 'Symptoms',
                     description: symptoms,
@@ -430,11 +385,7 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // ==================================================
-                  // TREATMENT
-                  // ==================================================
-
-                  const _InfoCard(
+                  _InfoCard(
                     icon: Icons.monitor_heart_outlined,
                     title: 'Treatment',
                     description: treatment,
@@ -442,10 +393,7 @@ class ScanInfoPage extends StatelessWidget {
 
                   const SizedBox(height: 22),
 
-                  // ==================================================
-                  // BOTTOM BUTTON
-                  // ==================================================
-
+                  // Bottom button
                   SizedBox(
                     width: double.infinity,
                     height: 46,
@@ -456,18 +404,15 @@ class ScanInfoPage extends StatelessWidget {
                             }
                           : onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFF5AA05B),
+                        backgroundColor: const Color(0xFF5AA05B),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(7),
                         ),
                       ),
                       child: Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             fromCollections
@@ -555,12 +500,9 @@ class _FullScreenScanImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final validDimensions =
-        imageWidth > 0 && imageHeight > 0;
+    final validDimensions = imageWidth > 0 && imageHeight > 0;
 
-    final aspectRatio = validDimensions
-        ? imageWidth / imageHeight
-        : 1.0;
+    final aspectRatio = validDimensions ? imageWidth / imageHeight : 1.0;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -571,8 +513,7 @@ class _FullScreenScanImage extends StatelessWidget {
               child: InteractiveViewer(
                 minScale: 1,
                 maxScale: 6,
-                boundaryMargin:
-                    const EdgeInsets.all(80),
+                boundaryMargin: const EdgeInsets.all(80),
                 child: Center(
                   child: AspectRatio(
                     aspectRatio: aspectRatio,
@@ -581,16 +522,13 @@ class _FullScreenScanImage extends StatelessWidget {
                       children: [
                         _buildImage(),
 
-                        if (detections.isNotEmpty &&
-                            validDimensions)
+                        if (detections.isNotEmpty && validDimensions)
                           IgnorePointer(
                             child: CustomPaint(
-                              painter:
-                                  _BoundingBoxPainter(
+                              painter: _BoundingBoxPainter(
                                 detections: detections,
                                 imageWidth: imageWidth,
-                                imageHeight:
-                                    imageHeight,
+                                imageHeight: imageHeight,
                               ),
                             ),
                           ),
@@ -612,15 +550,10 @@ class _FullScreenScanImage extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(
-                      alpha: 0.65,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(12),
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.white.withValues(
-                        alpha: 0.18,
-                      ),
+                      color: Colors.white.withValues(alpha: 0.18),
                     ),
                   ),
                   child: const Icon(
@@ -638,17 +571,13 @@ class _FullScreenScanImage extends StatelessWidget {
               bottom: 18,
               child: Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(
-                      alpha: 0.60,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(20),
+                    color: Colors.black.withValues(alpha: 0.60),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'Pinch to zoom • Drag to move',
@@ -690,72 +619,35 @@ class _BoundingBoxPainter extends CustomPainter {
       return;
     }
 
-    // -------------------------------------------------------------
     // BoxFit.contain scaling
-    // -------------------------------------------------------------
-
     final scaleX = size.width / imageWidth;
     final scaleY = size.height / imageHeight;
 
-    final scale =
-        scaleX < scaleY ? scaleX : scaleY;
+    final scale = scaleX < scaleY ? scaleX : scaleY;
 
-    final displayedWidth =
-        imageWidth * scale;
+    final displayedWidth = imageWidth * scale;
+    final displayedHeight = imageHeight * scale;
 
-    final displayedHeight =
-        imageHeight * scale;
-
-    final offsetX =
-        (size.width - displayedWidth) / 2;
-
-    final offsetY =
-        (size.height - displayedHeight) / 2;
-
-    // -------------------------------------------------------------
-    // DRAW EACH DETECTION
-    // -------------------------------------------------------------
+    final offsetX = (size.width - displayedWidth) / 2;
+    final offsetY = (size.height - displayedHeight) / 2;
 
     for (final detection in detections) {
-      final left =
-          offsetX + (detection.xmin * scale);
+      final left = offsetX + (detection.xmin * scale);
+      final top = offsetY + (detection.ymin * scale);
+      final right = offsetX + (detection.xmax * scale);
+      final bottom = offsetY + (detection.ymax * scale);
 
-      final top =
-          offsetY + (detection.ymin * scale);
-
-      final right =
-          offsetX + (detection.xmax * scale);
-
-      final bottom =
-          offsetY + (detection.ymax * scale);
-
-      final rect = Rect.fromLTRB(
-        left,
-        top,
-        right,
-        bottom,
-      );
-
-      // -----------------------------------------------------------
-      // BOUNDING BOX
-      // -----------------------------------------------------------
+      final rect = Rect.fromLTRB(left, top, right, bottom);
 
       final boxPaint = Paint()
         ..color = const Color(0xFF7CFF78)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5;
+        ..strokeWidth = 2.0;
 
-      canvas.drawRect(
-        rect,
-        boxPaint,
-      );
+      canvas.drawRect(rect, boxPaint);
 
-      // -----------------------------------------------------------
-      // LABEL
-      // -----------------------------------------------------------
-
-      final label =
-          '${detection.className} '
+      // Label
+      final label = '${detection.className} '
           '${detection.confidence.toStringAsFixed(0)}%';
 
       final textPainter = TextPainter(
@@ -764,7 +656,7 @@ class _BoundingBoxPainter extends CustomPainter {
           style: const TextStyle(
             color: Colors.white,
             fontSize: 10,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -773,31 +665,23 @@ class _BoundingBoxPainter extends CustomPainter {
 
       textPainter.layout();
 
-      const horizontalPadding = 6.0;
-      const verticalPadding = 4.0;
+      const horizontalPadding = 8.0;
+      const verticalPadding = 5.0;
 
-      final labelWidth =
-          textPainter.width +
-              (horizontalPadding * 2);
-
-      final labelHeight =
-          textPainter.height +
-              (verticalPadding * 2);
+      final labelWidth = textPainter.width + (horizontalPadding * 2);
+      final labelHeight = textPainter.height + (verticalPadding * 2);
 
       var labelLeft = left;
 
-      if (labelLeft + labelWidth >
-          size.width) {
-        labelLeft =
-            size.width - labelWidth;
+      if (labelLeft + labelWidth > size.width) {
+        labelLeft = size.width - labelWidth;
       }
 
       if (labelLeft < 0) {
         labelLeft = 0;
       }
 
-      var labelTop =
-          top - labelHeight;
+      var labelTop = top - labelHeight;
 
       if (labelTop < 0) {
         labelTop = top;
@@ -815,27 +699,19 @@ class _BoundingBoxPainter extends CustomPainter {
         ..style = PaintingStyle.fill;
 
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          labelRect,
-          const Radius.circular(4),
-        ),
+        RRect.fromRectAndRadius(labelRect, const Radius.circular(4)),
         labelPaint,
       );
 
       textPainter.paint(
         canvas,
-        Offset(
-          labelLeft + horizontalPadding,
-          labelTop + verticalPadding,
-        ),
+        Offset(labelLeft + horizontalPadding, labelTop + verticalPadding),
       );
     }
   }
 
   @override
-  bool shouldRepaint(
-    covariant _BoundingBoxPainter oldDelegate,
-  ) {
+  bool shouldRepaint(covariant _BoundingBoxPainter oldDelegate) {
     return oldDelegate.detections != detections ||
         oldDelegate.imageWidth != imageWidth ||
         oldDelegate.imageHeight != imageHeight;
@@ -849,9 +725,7 @@ class _BoundingBoxPainter extends CustomPainter {
 class _SmallInfoCard extends StatelessWidget {
   final Widget child;
 
-  const _SmallInfoCard({
-    required this.child,
-  });
+  const _SmallInfoCard({required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -859,14 +733,10 @@ class _SmallInfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.12,
-        ),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.28,
-          ),
+          color: Colors.white.withValues(alpha: 0.28),
         ),
       ),
       child: child,
@@ -895,19 +765,14 @@ class _InfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(
-          alpha: 0.12,
-        ),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(17),
         border: Border.all(
-          color: Colors.white.withValues(
-            alpha: 0.28,
-          ),
+          color: Colors.white.withValues(alpha: 0.28),
         ),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -915,16 +780,12 @@ class _InfoCard extends StatelessWidget {
                 width: 31,
                 height: 31,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(
-                    alpha: 0.75,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(7),
+                  color: Colors.white.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(7),
                 ),
                 child: Icon(
                   icon,
-                  color:
-                      const Color(0xFF587A59),
+                  color: const Color(0xFF587A59),
                   size: 17,
                 ),
               ),
@@ -935,7 +796,7 @@ class _InfoCard extends StatelessWidget {
                 title,
                 style: GoogleFonts.poppins(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -945,9 +806,7 @@ class _InfoCard extends StatelessWidget {
           const SizedBox(height: 10),
 
           Divider(
-            color: Colors.white.withValues(
-              alpha: 0.25,
-            ),
+            color: Colors.white.withValues(alpha: 0.25),
             height: 1,
           ),
 
@@ -956,10 +815,8 @@ class _InfoCard extends StatelessWidget {
           Text(
             description,
             style: GoogleFonts.poppins(
-              color: Colors.white.withValues(
-                alpha: 0.9,
-              ),
-              fontSize: 8.5,
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 10,
               height: 1.45,
               letterSpacing: -0.15,
             ),

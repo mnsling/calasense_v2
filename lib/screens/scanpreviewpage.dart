@@ -11,7 +11,14 @@ import 'scaninfopage.dart';
 
 class ScanPreviewPage extends StatefulWidget {
   final XFile image;
-  final void Function(XFile image) onSaveScan;
+  final void Function({
+    required XFile image,
+    required String diseaseName,
+    required double confidence,
+    required List<YoloDetection> detections,
+    required double imageWidth,
+    required double imageHeight,
+  }) onSaveScan;
 
   const ScanPreviewPage({
     super.key,
@@ -112,7 +119,14 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
             imageHeight: result.imageHeight,
 
             onSave: () {
-              widget.onSaveScan(_currentImage);
+              widget.onSaveScan(
+                image: _currentImage,
+                diseaseName: result.diseaseName,
+                confidence: result.confidence,
+                detections: result.detections,
+                imageWidth: result.imageWidth,
+                imageHeight: result.imageHeight,
+              );
             },
           ),
         ),
@@ -223,11 +237,11 @@ class _ScanPreviewPageState extends State<ScanPreviewPage> {
 
                   ClipRRect(
                     borderRadius: BorderRadius.circular(18),
-                    child: AspectRatio(
-                      aspectRatio: 1,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 320,
                       child: Image.file(
                         File(_currentImage.path),
-                        width: double.infinity,
                         fit: BoxFit.cover,
                       ),
                     ),
