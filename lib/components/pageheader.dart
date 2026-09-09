@@ -39,7 +39,7 @@ class PageHeader extends StatelessWidget {
                 subtitle,
                 style: GoogleFonts.poppins(
                   color: Colors.white.withValues(alpha: 0.82),
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w400,
                   letterSpacing: -0.25,
                   height: 1.35,

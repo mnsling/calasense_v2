@@ -16,7 +16,7 @@ class OverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 125,
+      width: 180,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.15),
@@ -30,7 +30,7 @@ class OverviewCard extends StatelessWidget {
           Text(
             value,
             style: GoogleFonts.poppins(
-              fontSize: 20,
+              fontSize: 18,
               color: Colors.white,
               fontWeight: FontWeight.w500,
               letterSpacing: -0.5,
@@ -44,7 +44,7 @@ class OverviewCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.poppins(
-              fontSize: 10,
+              fontSize: 12,
               color: Colors.white,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.25,
@@ -54,7 +54,7 @@ class OverviewCard extends StatelessWidget {
           Text(
             subtitle,
             style: GoogleFonts.poppins(
-              fontSize: 8,
+              fontSize: 12,
               color: Colors.white70,
               fontWeight: FontWeight.w400,
               letterSpacing: -0.15,

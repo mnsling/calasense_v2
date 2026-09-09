@@ -38,7 +38,7 @@ class FilterChipButton extends StatelessWidget {
             color: isSelected
                 ? const Color(0xFF4C824F)
                 : Colors.white,
-            fontSize: 9,
+            fontSize: 10,
             fontWeight:
                 isSelected ? FontWeight.w600 : FontWeight.w400,
             letterSpacing: -0.2,

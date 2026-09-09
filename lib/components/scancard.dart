@@ -50,7 +50,7 @@ class ScanCard extends StatelessWidget {
                       'Scan Plant Now',
                       style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -0.4,
                       ),
@@ -60,7 +60,7 @@ class ScanCard extends StatelessWidget {
                       'Instantly spot plant issues.',
                       style: GoogleFonts.poppins(
                         color: Colors.white70,
-                        fontSize: 10,
+                        fontSize: 12,
                         fontWeight: FontWeight.w400,
                         letterSpacing: -0.2,
                       ),

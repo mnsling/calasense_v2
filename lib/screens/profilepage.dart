@@ -137,7 +137,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     username,
                                     style: GoogleFonts.poppins(
                                       color: const Color(0xFF315B34),
-                                      fontSize: 15,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: -0.5,
                                     ),
@@ -149,7 +149,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     email,
                                     style: GoogleFonts.poppins(
                                       color: Colors.grey.shade500,
-                                      fontSize: 9,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ],
@@ -220,7 +220,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       loggingOut ? 'Logging Out...' : 'Log Out',
                       style: GoogleFonts.poppins(
                         color: const Color(0xFFD85C5C),
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -601,7 +601,7 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
                                       ? 'Uploading...'
                                       : 'Change Photo',
                                   style: GoogleFonts.poppins(
-                                    fontSize: 8,
+                                    fontSize: 12,
                                     color: Colors.grey.shade600,
                                   ),
                                 ),
@@ -655,7 +655,7 @@ class _PersonalInformationPageState extends State<PersonalInformationPage> {
                                       : Text(
                                           'Save Changes',
                                           style: GoogleFonts.poppins(
-                                            fontSize: 10,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -758,11 +758,11 @@ class MenuTile extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500),
+        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
       ),
       subtitle: Text(
         subtitle,
-        style: GoogleFonts.poppins(fontSize: 8, color: Colors.grey.shade500),
+        style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500),
       ),
     );
   }
@@ -795,7 +795,7 @@ class InputField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
         ),
 
         const SizedBox(height: 5),
@@ -818,7 +818,7 @@ class InputField extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 readOnly: readOnly,
-                style: GoogleFonts.poppins(fontSize: 9),
+                style: GoogleFonts.poppins(fontSize: 10),
                 decoration: InputDecoration(
                   isDense: true,
                   filled: true,
@@ -865,7 +865,7 @@ class PasswordField extends StatelessWidget {
       children: [
         Text(
           'Password',
-          style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600),
         ),
 
         const SizedBox(height: 5),
@@ -901,7 +901,7 @@ class PasswordField extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '••••••••',
-                        style: GoogleFonts.poppins(fontSize: 9),
+                        style: GoogleFonts.poppins(fontSize: 10),
                       ),
                     ),
 
@@ -911,7 +911,7 @@ class PasswordField extends StatelessWidget {
                         'Change',
                         style: GoogleFonts.poppins(
                           color: const Color(0xFF49784D),
-                          fontSize: 8.5,
+                          fontSize: 10,
                         ),
                       ),
                     ),

@@ -58,7 +58,7 @@ class RecentScanCard extends StatelessWidget {
                   date,
                   style: GoogleFonts.poppins(
                     color: Colors.white70,
-                    fontSize: 8,
+                    fontSize: 10,
                   ),
                 ),
 
@@ -77,7 +77,7 @@ class RecentScanCard extends StatelessWidget {
                     badgeText,
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 7,
+                      fontSize: 10,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
