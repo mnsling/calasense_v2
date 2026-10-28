@@ -1,65 +1,153 @@
 
-# CalaSense
+<div align="center">
 
-**Calamansi Leaf Disease Detection Using YOLOv5 and Feature Engineering**
+<h1><code>CALASENSE</code></h1>
 
-CalaSense is an AI-powered application designed to identify diseases in calamansi leaves through image-based analysis. The system utilizes the YOLOv5 object detection algorithm with the implementation of feature engineering techniques to support the recognition of visible disease symptoms.
+<code>Calamansi Leaf Disease Detection · Computer Vision · Deep Learning</code>
 
-The project explores the application of computer vision and deep learning in agriculture, aiming to provide a more accessible approach to plant disease identification.
+<br><br>
 
-<!-- Replace with an actual screenshot of the application -->
-![CalaSense Application Preview](assets/calasense-preview.png)
+<img src="assets/calasense-preview.png" alt="CalaSense mobile application preview" width="680">
 
-## Features
+<br><br>
 
-### Leaf Disease Detection
-- Analyze calamansi leaf images for visible disease symptoms.
-- Identify supported disease categories using a trained YOLOv5 model.
-- Present detection results through the application interface.
+<code>CAPTURE.</code> &nbsp; <code>DETECT.</code> &nbsp; <code>ANALYZE.</code>
 
-### YOLOv5 Integration
-- Uses YOLOv5 for image-based disease detection.
-- Applies deep learning to recognize visual patterns associated with leaf diseases.
-- Supports automated analysis of calamansi leaf images.
-
-### Feature Engineering
-- Incorporates feature engineering techniques into the disease detection workflow.
-- Focuses on improving the representation of relevant visual characteristics.
-- Explores image processing and feature optimization for model development.
-
-## Methodology
-
-The CalaSense detection workflow consists of four primary stages:
-
-1. **Image Acquisition** — Collect calamansi leaf images for analysis.
-2. **Preprocessing and Feature Engineering** — Prepare image data and apply feature engineering techniques.
-3. **Disease Detection** — Process images using the trained YOLOv5 model.
-4. **Result Presentation** — Display the model's detection output.
-
-## Technology
-
-- **Python** — Machine learning development
-- **YOLOv5** — Object detection framework
-- **Computer Vision** — Image-based disease analysis
-- **Feature Engineering** — Image feature processing and optimization
-- **Deep Learning** — Model training and inference
-
-## Project Objective
-
-CalaSense aims to investigate how YOLOv5 and feature engineering techniques can be applied to calamansi leaf disease detection.
-
-The project focuses on supporting agricultural monitoring through automated image analysis and exploring the potential of machine learning as an assistive tool for plant health assessment.
-
-## Limitations
-
-Detection performance may vary depending on image quality, lighting conditions, leaf orientation, and the diseases represented in the training dataset.
-
-The application is intended as a supplementary detection tool and should not replace professional agricultural assessment.
-
-## Development Status
-
-CalaSense is a research-oriented application exploring the integration of object detection and feature engineering for agricultural disease recognition.
+</div>
 
 ---
 
-**CalaSense** — Intelligent Calamansi Leaf Disease Detection.
+### <code>OVERVIEW</code>
+
+CalaSense is a mobile application developed to assist in the identification of calamansi leaf diseases through image-based analysis.
+
+The application integrates the **YOLOv5 object detection model** with feature engineering techniques to recognize visible symptoms associated with leaf diseases.
+
+By applying computer vision and deep learning to agricultural monitoring, CalaSense explores a more accessible and efficient approach to plant disease identification.
+
+---
+
+### <code>FEATURES</code>
+
+**<code>01 / Leaf Image Analysis</code>**
+
+- Analyze images of calamansi leaves.
+- Process leaf images for disease detection.
+- Support image-based identification of visible symptoms.
+- Provide a mobile interface for accessing detection results.
+
+**<code>02 / YOLOv5 Disease Detection</code>**
+
+- Integrate a trained YOLOv5 object detection model.
+- Recognize visual patterns associated with supported leaf diseases.
+- Detect disease-related features within leaf images.
+- Generate model-based detection results.
+
+**<code>03 / Feature Engineering</code>**
+
+- Incorporate feature engineering techniques into the detection workflow.
+- Apply image preprocessing to prepare visual data.
+- Explore relevant image characteristics for disease recognition.
+- Support the development and optimization of the detection model.
+
+**<code>04 / Detection Results</code>**
+
+- Present disease detection outputs through the application.
+- Display the model's identified disease categories.
+- Assist users in interpreting visible leaf symptoms.
+- Provide information that supports further plant health assessment.
+
+---
+
+### <code>HOW IT WORKS</code>
+
+```text
+01  Acquire a calamansi leaf image
+         |
+02  Prepare the image for analysis
+         |
+03  Apply the detection pipeline
+         |
+04  Process using the YOLOv5 model
+         |
+05  Identify supported disease symptoms
+         |
+06  Display detection results
+```
+
+CalaSense combines image processing and object detection to support automated analysis of calamansi leaf conditions.
+
+---
+
+### <code>TECHNOLOGY STACK</code>
+
+| Technology | Purpose |
+|:-----------|:--------|
+| `YOLOv5` | Object detection and disease recognition |
+| `Python` | Model development and processing |
+| `PyTorch` | Deep learning framework used by YOLOv5 |
+| `Computer Vision` | Image analysis and visual feature processing |
+| `Feature Engineering` | Image feature preparation and optimization |
+
+---
+
+### <code>METHODOLOGY</code>
+
+**<code>01 / Data Preparation</code>**
+
+Calamansi leaf images are prepared for model development and disease detection.
+
+**<code>02 / Feature Engineering</code>**
+
+Feature engineering techniques are incorporated to improve the representation of relevant visual characteristics.
+
+**<code>03 / Model Development</code>**
+
+YOLOv5 is used as the primary object detection architecture for learning disease-related visual patterns.
+
+**<code>04 / Mobile Integration</code>**
+
+The detection workflow is integrated into a mobile application to provide an accessible interface for image analysis.
+
+**<code>05 / Result Interpretation</code>**
+
+The application presents model predictions to support the identification of possible calamansi leaf diseases.
+
+---
+
+### <code>PROJECT OBJECTIVES</code>
+
+- Explore deep learning for calamansi leaf disease detection.
+- Integrate YOLOv5 with feature engineering techniques.
+- Support automated recognition of visible disease symptoms.
+- Develop an accessible mobile-based detection system.
+- Investigate the potential of computer vision in agricultural applications.
+
+---
+
+### <code>LIMITATIONS</code>
+
+- Detection accuracy depends on image quality, lighting, and leaf visibility.
+- Performance is limited to disease categories represented in the training dataset.
+- Visually similar symptoms may produce incorrect predictions.
+- Model results should be treated as preliminary assessments rather than definitive plant disease diagnoses.
+
+---
+
+### <code>DEVELOPMENT STATUS</code>
+
+`Research-oriented project` · `Mobile application` · `Computer vision`
+
+CalaSense explores the application of deep learning and feature engineering in agricultural disease detection.
+
+---
+
+<div align="center">
+
+<sub>Built with YOLOv5 · Computer Vision · Feature Engineering</sub>
+
+<br>
+
+<sub>CALASENSE — Intelligent Calamansi Leaf Disease Detection.</sub>
+
+</div>
